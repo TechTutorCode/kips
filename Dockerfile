@@ -6,7 +6,7 @@ COPY requirements.txt /tmp/
 ENV OAUTHLIB_INSECURE_TRANSPORT=0
 
 # upgrade pip and install required python packages
-RUN pip install -U pip
+# RUN pip install -U pip
 RUN pip install -r /tmp/requirements.txt
 
 # copy over our org code
