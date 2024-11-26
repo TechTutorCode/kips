@@ -9,7 +9,11 @@ app = Flask(__name__)
 
 # Database setup (replace with your actual database URL)
 
-Base.metadata.create_all(engine)
+try:
+    Base.metadata.create_all(engine)
+    print("Tables created successfully.")
+except Exception as e:
+    print(f"Error creating tables: {e}")
 Session = sessionmaker(bind=engine)
 session = Session()
 @app.route("/")
