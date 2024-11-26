@@ -1,16 +1,13 @@
-FROM tiangolo/uwsgi-nginx-flask:python3.10
+FROM tiangolo/uwsgi-nginx-flask:python3.7
 
-WORKDIR /python-docker
+# copy over our requirements.txt file
+COPY requirements.txt /tmp/
 
-COPY requirements.txt requirements.txt
-RUN pip3 install -r requirements.txt
+ENV OAUTHLIB_INSECURE_TRANSPORT=0
 
+# upgrade pip and install required python packages
+RUN pip install -U pip
+RUN pip install -r /tmp/requirements.txt
+
+# copy over our org code
 COPY . .
-
-
-
-ENV FLASK_APP=main.py
-
-EXPOSE 5000
-
-CMD [ "python3", "-m" , "flask", "run", "--host=0.0.0.0"]
