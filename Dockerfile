@@ -1,4 +1,4 @@
-FROM python:3.12-slim-buster
+FROM tiangolo/uwsgi-nginx-flask:python3.10
 
 WORKDIR /python-docker
 
