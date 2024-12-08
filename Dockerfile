@@ -8,6 +8,7 @@ ENV OAUTHLIB_INSECURE_TRANSPORT=0
 # upgrade pip and install required python packages
 # RUN pip install -U pip
 RUN pip install -r /tmp/requirements.txt
+RUN pip install flask_sqlalchemy
 
 # copy over our org code
 COPY . .
