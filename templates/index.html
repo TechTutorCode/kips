@@ -170,7 +170,7 @@
                                         <td>KES {{ "{:,.2f}".format(bill.paid_amount) }}</td>
                                         <td>KES {{ "{:,.2f}".format(bill.total_amount - bill.paid_amount) }}</td>
                                         <td class="text-right">
-                                            <span class="custom-badge status-{{ 'green' if bill.status == 'Paid' else 'orange' if bill.status == 'Partially Paid' else 'red' }}">
+                                            <span class="custom-badge status-{{ 'green' if bill.status == 'Paid' else 'orange' if bill.status == 'Partial' else 'red' }}">
                                                 {{ bill.status }}
                                             </span>
                                         </td>

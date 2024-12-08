@@ -1,28 +1,62 @@
-from flask import Flask, request, jsonify,render_template, redirect, flash, url_for
-from sqlalchemy.orm import sessionmaker
-from werkzeug.security import generate_password_hash
+from flask import Flask, request, jsonify, render_template, redirect, flash, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
+from datetime import datetime
 
 # Initialize Flask app
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///kips.db"
 app.config["SECRET_KEY"] = "#deno0707@mwangi"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Initialize SQLAlchemy
 db = SQLAlchemy(app)
 
-from datetime import datetime
+# Initialize LoginManager
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# Import models after db initialization to avoid circular imports
+from models.users import User
 from models.patients import Patient
 from models.doctors import Doctor
 from models.patient_records import PatientRecord
+from models.lab_results import LabResult
 from models.lab_services import LabService
 from models.pharmacy import PharmacyItem
 from models.billing import Bill, BillItem, Payment
+from models.lab_technicians import LabTechnician
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# Role-based access control decorator
+def role_required(roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                flash('Please log in to access this page.', 'error')
+                return redirect(url_for('login'))
+            
+            if current_user.role not in roles:
+                flash('You do not have permission to access this page.', 'error')
+                return redirect(url_for('index'))
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 with app.app_context():
     db.create_all()  # Ensures all tables are created before handling requests
 
 @app.route("/")
+@login_required
 def index():
     # Get today's date range
     today = datetime(2024, 12, 9).date()  # Using provided timestamp
@@ -64,59 +98,85 @@ def index():
                          recent_bills=recent_bills)
 
 @app.route('/doctors')
+@login_required
+@role_required(['admin', 'doctor'])
 def add_doctor():
     if request.method=="GET":
         doctors=Doctor.query.all()
         print(doctors)
         return render_template("doctors.html", doctors=doctors)
+
 @app.route('/department')
+@login_required
 def department():
      return render_template('departments.html')
+
 @app.route('/patients')
+@login_required
+@role_required(['admin', 'doctor'])
 def patient():
      patients = Patient.query.all()
      return render_template('patients.html', patients=patients)
+
 @app.route('/add-doctor',  methods=['POST','GET'])
+@login_required
+@role_required(['admin'])
 def add_d():
     if request.method=="GET":
         return render_template("add_doctor.html")
-    try:
-            # Extract data from the form submission
-            first_name = request.form['first_name']
-            last_name = request.form['last_name']
-            email = request.form['email']
-            password = request.form['password']
-            gender = request.form['gender']
-            phone = request.form['phone']
-            status = request.form.get('status', 'true').lower() == 'true'  # Default to True
-
-            # Create a new doctor object
+    
+    if request.method=="POST":
+        try:
+            first_name = request.form.get('first_name')
+            last_name = request.form.get('last_name')
+            email = request.form.get('email')
+            password = request.form.get('password')
+            gender = request.form.get('gender')
+            phone = request.form.get('phone')
+            
+            # Create new doctor
             new_doctor = Doctor(
                 first_name=first_name,
                 last_name=last_name,
                 email=email,
-                password=generate_password_hash(password),  # Hash the password
+                password=password,
                 gender=gender,
                 phone=phone,
-                status=status,
+                status=True
             )
-
-            # Add the doctor to the database
+            
+            # Create corresponding user account
+            from models.users import User
+            new_user = User(
+                username=f"{first_name.lower()}.{last_name.lower()}",
+                email=email,
+                role='doctor'
+            )
+            new_user.password_hash = password  # Use the same password
+            
+            # Add both to session
             db.session.add(new_doctor)
+            db.session.add(new_user)
+            
             db.session.commit()
-            return redirect("/doctors")
-    except Exception as e:
+            
+            flash('Doctor added successfully!', 'success')
+            return redirect(url_for('add_doctor'))
+        
+        except Exception as e:
             db.session.rollback()
-            return jsonify({"error": str(e)}), 500
-    finally:
-            db.session.close()
-    
+            flash(f'Error adding doctor: {str(e)}', 'error')
+            return render_template("add_doctor.html")
+
 @app.route('/profile/<int:id>')
+@login_required
 def profile(id):
      doctor = Doctor.query.filter_by(id=id).first()
      return render_template("profile.html", doctor=doctor)      
 
 @app.route('/add-patient',  methods=['POST','GET'])
+@login_required
+@role_required(['admin', 'doctor'])
 def add_p():
     if request.method=="GET":
         return render_template("add_patient.html")
@@ -147,6 +207,8 @@ def add_p():
         return redirect(url_for('patient'))
 
 @app.route('/delete-patient', methods=['POST'])
+@login_required
+@role_required(['admin', 'doctor'])
 def delete_patient():
     patient_id = request.form.get('patient_id')
     if patient_id:
@@ -158,6 +220,8 @@ def delete_patient():
     return redirect(url_for('patient'))
 
 @app.route('/edit-doctor/<int:doctor_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
 def edit_doctor(doctor_id):
     doctor = Doctor.query.get_or_404(doctor_id)
     
@@ -181,6 +245,8 @@ def edit_doctor(doctor_id):
     return render_template('edit_doctor.html', doctor=doctor)
 
 @app.route('/edit-patient/<int:patient_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin', 'doctor'])
 def edit_patient(patient_id):
     patient = Patient.query.get_or_404(patient_id)
     
@@ -206,12 +272,27 @@ def edit_patient(patient_id):
     return render_template('edit_patient.html', patient=patient)
 
 @app.route('/patient-records/<int:patient_id>')
+@login_required
+@role_required(['admin', 'doctor'])
 def patient_records(patient_id):
     patient = Patient.query.get_or_404(patient_id)
     records = PatientRecord.query.filter_by(patient_id=patient_id).order_by(PatientRecord.created_at.desc()).all()
-    return render_template('patient_records.html', patient=patient, records=records)
+    
+    # Get lab results for this patient
+    lab_results = BillItem.query.join(Bill).join(Bill.patient).filter(
+        BillItem.item_type == 'Lab Service',
+        Bill.patient_id == patient_id,
+        Bill.status.in_(['Paid', 'Partial'])
+    ).order_by(BillItem.created_at.desc()).all()
+    
+    return render_template('patient_records.html', 
+                         patient=patient, 
+                         records=records,
+                         lab_results=lab_results)
 
 @app.route('/add-record/<int:patient_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin', 'doctor'])
 def add_record(patient_id):
     patient = Patient.query.get_or_404(patient_id)
     doctors = Doctor.query.all()
@@ -237,6 +318,8 @@ def add_record(patient_id):
     return render_template('add_record.html', patient=patient, doctors=doctors)
 
 @app.route('/edit-record/<int:record_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin', 'doctor'])
 def edit_record(record_id):
     record = PatientRecord.query.get_or_404(record_id)
     doctors = Doctor.query.all()
@@ -260,6 +343,7 @@ def edit_record(record_id):
     return render_template('edit_record.html', record=record, doctors=doctors)
 
 @app.route('/appointments')
+@login_required
 def appointments():
     today = datetime.now().date()
     # Get all records with next_visit date that's today or in the future
@@ -270,6 +354,8 @@ def appointments():
     return render_template('appointments.html', appointments=appointments, today=today)
 
 @app.route('/add-appointment', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin', 'doctor'])
 def add_appointment():
     if request.method == 'POST':
         patient_id = request.form.get('patient_id')
@@ -297,11 +383,14 @@ def add_appointment():
     return render_template('add_appointment.html', patients=patients, doctors=doctors)
 
 @app.route('/lab-services')
+@login_required
 def lab_services():
     services = LabService.query.order_by(LabService.name).all()
     return render_template('lab_services.html', services=services)
 
 @app.route('/add-lab-service', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
 def add_lab_service():
     if request.method == 'POST':
         name = request.form.get('name')
@@ -323,6 +412,8 @@ def add_lab_service():
     return render_template('add_lab_service.html')
 
 @app.route('/edit-lab-service/<int:service_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
 def edit_lab_service(service_id):
     service = LabService.query.get_or_404(service_id)
     
@@ -338,6 +429,8 @@ def edit_lab_service(service_id):
     return render_template('edit_lab_service.html', service=service)
 
 @app.route('/delete-lab-service/<int:service_id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
 def delete_lab_service(service_id):
     service = LabService.query.get_or_404(service_id)
     db.session.delete(service)
@@ -347,11 +440,14 @@ def delete_lab_service(service_id):
     return redirect(url_for('lab_services'))
 
 @app.route('/pharmacy')
+@login_required
 def pharmacy():
     items = PharmacyItem.query.order_by(PharmacyItem.name).all()
     return render_template('pharmacy.html', items=items)
 
 @app.route('/add-pharmacy-item', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
 def add_pharmacy_item():
     if request.method == 'POST':
         name = request.form.get('name')
@@ -381,6 +477,8 @@ def add_pharmacy_item():
     return render_template('add_pharmacy_item.html')
 
 @app.route('/edit-pharmacy-item/<int:item_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
 def edit_pharmacy_item(item_id):
     item = PharmacyItem.query.get_or_404(item_id)
     
@@ -400,6 +498,8 @@ def edit_pharmacy_item(item_id):
     return render_template('edit_pharmacy_item.html', item=item)
 
 @app.route('/delete-pharmacy-item/<int:item_id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
 def delete_pharmacy_item(item_id):
     item = PharmacyItem.query.get_or_404(item_id)
     db.session.delete(item)
@@ -409,11 +509,23 @@ def delete_pharmacy_item(item_id):
     return redirect(url_for('pharmacy'))
 
 @app.route('/billing')
+@login_required
 def billing():
     bills = Bill.query.order_by(Bill.created_at.desc()).all()
+    # Update statuses based on balance
+    for bill in bills:
+        if bill.balance > 0:
+            bill.status = 'Partial'
+        elif bill.paid_amount >= bill.total_amount and bill.balance == 0:
+            bill.status = 'Paid'
+        else:
+            bill.status = 'Pending'
+    db.session.commit()
     return render_template('billing.html', bills=bills)
 
 @app.route('/create-bill', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin', 'billing'])
 def create_bill():
     if request.method == 'POST':
         try:
@@ -445,106 +557,64 @@ def create_bill():
             quantities = request.form.getlist('quantity[]')
             unit_prices = request.form.getlist('unit_price[]')
             total_prices = request.form.getlist('total_price[]')
-
-            if not item_types or len(item_types) == 0:
-                flash('No items added to the bill', 'error')
-                return redirect(url_for('create_bill'))
-
-            for i in range(len(item_types)):
-                # Validate quantity
-                try:
-                    quantity = int(quantities[i])
-                    if quantity < 1:
-                        raise ValueError('Invalid quantity')
-                except (ValueError, TypeError):
-                    flash(f'Invalid quantity for item: {descriptions[i]}', 'error')
-                    return redirect(url_for('create_bill'))
-
-                # Validate prices
-                try:
-                    unit_price = float(unit_prices[i])
-                    total_price = float(total_prices[i])
-                    if unit_price <= 0 or total_price <= 0:
-                        raise ValueError('Invalid price')
-                except (ValueError, TypeError):
-                    flash(f'Invalid price for item: {descriptions[i]}', 'error')
-                    return redirect(url_for('create_bill'))
-
-                # Create bill item
-                item = BillItem(
-                    bill_id=bill.id,
-                    item_type=item_types[i],
-                    item_id=item_ids[i],
-                    description=descriptions[i],
-                    quantity=quantity,
-                    unit_price=unit_price,
-                    total_price=total_price
-                )
-                
-                # Update inventory for pharmacy items
-                if item_types[i] == 'Pharmacy':
-                    pharmacy_item = PharmacyItem.query.get(item_ids[i])
-                    if not pharmacy_item:
-                        flash(f'Invalid pharmacy item: {descriptions[i]}', 'error')
-                        return redirect(url_for('create_bill'))
-                        
-                    if pharmacy_item.quantity >= quantity:
-                        pharmacy_item.quantity -= quantity
-                    else:
-                        flash(f'Insufficient quantity for item: {descriptions[i]}', 'error')
-                        return redirect(url_for('create_bill'))
-                
-                # Validate lab service exists
-                elif item_types[i] == 'Lab Service':
-                    lab_service = LabService.query.get(item_ids[i])
-                    if not lab_service:
-                        flash(f'Invalid lab service: {descriptions[i]}', 'error')
-                        return redirect(url_for('create_bill'))
-
-                db.session.add(item)
-
-            db.session.commit()
-            flash('Bill created successfully!', 'success')
-            return redirect(url_for('view_bill', bill_id=bill.id))
+            bill_item_ids = request.form.getlist('bill_item_id[]')
             
+            for i in range(len(item_types)):
+                if bill_item_ids[i]:  # Update existing item
+                    bill_item = BillItem.query.get(int(bill_item_ids[i]))
+                    bill_item.item_type = item_types[i]
+                    bill_item.item_id = item_ids[i]
+                    bill_item.quantity = quantities[i]
+                    bill_item.description = descriptions[i]
+                    bill_item.unit_price = unit_prices[i]
+                    bill_item.total_price = total_prices[i]
+                else:  # Add new item
+                    bill_item = BillItem(
+                        bill_id=bill_id,
+                        item_type=item_types[i],
+                        item_id=item_ids[i],
+                        quantity=quantities[i],
+                        description=descriptions[i],
+                        unit_price=unit_prices[i],
+                        total_price=total_prices[i]
+                    )
+                    db.session.add(bill_item)
+        
+            # Update bill total
+            bill.total_amount = sum(float(price) for price in total_prices)
+        
+            try:
+                db.session.commit()
+                flash('Bill updated successfully', 'success')
+                return redirect(url_for('billing'))
+            except Exception as e:
+                db.session.rollback()
+                flash('Error updating bill: ' + str(e), 'error')
         except Exception as e:
-            db.session.rollback()
-            flash('Error creating bill: ' + str(e), 'error')
-            return redirect(url_for('create_bill'))
-
-    patients = Patient.query.order_by(Patient.first_name).all()
+                db.session.rollback()
+                flash('Error updating bill: ' + str(e), 'error')
+    # GET request - show edit form
+    patients = Patient.query.all()
+    lab_services = LabService.query.all()
+    pharmacy_items = PharmacyItem.query.all()
+    bill_items = BillItem.query.filter_by(bill_id=bill_id).all()
     
-    # Serialize lab services
-    lab_services = [{
-        'id': service.id,
-        'name': service.name,
-        'description': service.description,
-        'cost': float(service.cost)
-    } for service in LabService.query.all()]
-    
-    # Serialize pharmacy items
-    pharmacy_items = [{
-        'id': item.id,
-        'name': item.name,
-        'description': item.description,
-        'cost_per_unit': float(item.cost_per_unit),
-        'quantity': item.quantity
-    } for item in PharmacyItem.query.all()]
-    
-    today = datetime.now().strftime('%Y-%m-%d')
-    
-    return render_template('create_bill.html', 
+    return render_template('edit_bill.html', 
                          patients=patients,
                          lab_services=lab_services,
                          pharmacy_items=pharmacy_items,
-                         today=today)
+                         bill=bill,
+                         bill_items=bill_items)
 
 @app.route('/view-bill/<int:bill_id>')
+@login_required
 def view_bill(bill_id):
     bill = Bill.query.get_or_404(bill_id)
     return render_template('view_bill.html', bill=bill)
 
 @app.route('/add-payment/<int:bill_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin', 'billing'])
 def add_payment(bill_id):
     bill = Bill.query.get_or_404(bill_id)
     
@@ -566,10 +636,10 @@ def add_payment(bill_id):
 
         # Update bill
         bill.paid_amount += amount
-        if bill.paid_amount >= bill.total_amount:
+        if bill.paid_amount >= bill.total_amount and bill.balance == 0:
             bill.status = 'Paid'
         else:
-            bill.status = 'Partially Paid'
+            bill.status = 'Partial'
 
         db.session.commit()
         flash('Payment added successfully!', 'success')
@@ -579,36 +649,35 @@ def add_payment(bill_id):
     return render_template('add_payment.html', bill=bill, today=today)
 
 @app.route('/edit_bill/<int:bill_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin', 'billing'])
 def edit_bill(bill_id):
     bill = Bill.query.get_or_404(bill_id)
     
     if request.method == 'POST':
-        # Delete removed items
-        bill_items = BillItem.query.filter_by(bill_id=bill_id).all()
-        posted_item_ids = request.form.getlist('bill_item_id[]')
-        for item in bill_items:
-            if str(item.id) not in posted_item_ids:
-                db.session.delete(item)
-        
-        # Update existing items and add new ones
-        item_types = request.form.getlist('item_type[]')
-        item_ids = request.form.getlist('item_id[]')
-        quantities = request.form.getlist('quantity[]')
-        descriptions = request.form.getlist('description[]')
-        unit_prices = request.form.getlist('unit_price[]')
-        total_prices = request.form.getlist('total_price[]')
-        bill_item_ids = request.form.getlist('bill_item_id[]')
-        
-        for i in range(len(item_types)):
-            if bill_item_ids[i]:  # Update existing item
-                bill_item = BillItem.query.get(int(bill_item_ids[i]))
-                bill_item.item_type = item_types[i]
-                bill_item.item_id = item_ids[i]
-                bill_item.quantity = quantities[i]
-                bill_item.description = descriptions[i]
-                bill_item.unit_price = unit_prices[i]
-                bill_item.total_price = total_prices[i]
-            else:  # Add new item
+        try:
+            # Extract form data
+            patient_id = request.form.get('patient_id')
+            bill_date = request.form.get('bill_date')
+            
+            # Update bill details
+            bill.patient_id = patient_id
+            bill.bill_date = datetime.strptime(bill_date, '%Y-%m-%d')
+            
+            # Process bill items
+            item_types = request.form.getlist('item_type[]')
+            item_ids = request.form.getlist('item_id[]')
+            descriptions = request.form.getlist('description[]')
+            quantities = request.form.getlist('quantity[]')
+            unit_prices = request.form.getlist('unit_price[]')
+            total_prices = request.form.getlist('total_price[]')
+            bill_item_ids = request.form.getlist('bill_item_id[]')
+            
+            # Remove existing bill items
+            BillItem.query.filter_by(bill_id=bill_id).delete()
+            
+            # Add new bill items
+            for i in range(len(item_types)):
                 bill_item = BillItem(
                     bill_id=bill_id,
                     item_type=item_types[i],
@@ -619,17 +688,18 @@ def edit_bill(bill_id):
                     total_price=total_prices[i]
                 )
                 db.session.add(bill_item)
-        
-        # Update bill total
-        bill.total_amount = sum(float(price) for price in total_prices)
-        
-        try:
+            
+            # Update bill total
+            bill.total_amount = sum(float(price) for price in total_prices)
+            
             db.session.commit()
             flash('Bill updated successfully', 'success')
             return redirect(url_for('billing'))
+        
         except Exception as e:
             db.session.rollback()
-            flash('Error updating bill: ' + str(e), 'error')
+            flash(f'Error updating bill: {str(e)}', 'error')
+            return redirect(url_for('edit_bill', bill_id=bill_id))
     
     # GET request - show edit form
     patients = Patient.query.all()
@@ -643,6 +713,245 @@ def edit_bill(bill_id):
                          pharmacy_items=pharmacy_items,
                          bill=bill,
                          bill_items=bill_items)
+
+@app.route('/fix-bill-statuses')
+@login_required
+@role_required(['admin', 'billing'])
+def fix_bill_statuses():
+    bills = Bill.query.all()
+    for bill in bills:
+        if bill.balance > 0:
+            bill.status = 'Partial'
+        elif bill.paid_amount >= bill.total_amount and bill.balance == 0:
+            bill.status = 'Paid'
+        else:
+            bill.status = 'Pending'
+    db.session.commit()
+    flash('Bill statuses have been updated', 'success')
+    return redirect(url_for('billing'))
+
+@app.route('/lab-results')
+@login_required
+@role_required(['admin', 'lab_technician'])
+def lab_results():
+    # If lab technician, show only their results
+    if current_user.role == 'lab_technician':
+        technician = LabTechnician.query.filter_by(email=current_user.email).first()
+        results = LabResult.query.filter_by(technician_id=technician.id).all()
+    else:
+        # Admin sees all results
+        results = LabResult.query.all()
+    
+    return render_template('lab_results.html', results=results)
+
+@app.route('/add-lab-result/<int:bill_item_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin', 'lab_technician'])
+def add_lab_result(bill_item_id):
+    bill_item = BillItem.query.get_or_404(bill_item_id)
+    
+    if request.method == 'POST':
+        result_value = request.form.get('result_value')
+        reference_range = request.form.get('reference_range')
+        status = request.form.get('status')
+        performed_by = request.form.get('performed_by')
+        performed_at = request.form.get('performed_at')
+        remarks = request.form.get('remarks')
+        
+        # Create lab result
+        lab_result = LabResult(
+            bill_item_id=bill_item.id,
+            result_value=result_value,
+            reference_range=reference_range,
+            status=status,
+            performed_by=performed_by,
+            performed_at=datetime.strptime(performed_at, '%Y-%m-%dT%H:%M') if performed_at else None,
+            remarks=remarks
+        )
+        
+        db.session.add(lab_result)
+        db.session.commit()
+        
+        flash('Lab result added successfully!', 'success')
+        return redirect(url_for('lab_results'))
+    
+    return render_template('add_lab_result.html', bill_item=bill_item, lab_result=None)
+
+@app.route('/edit-lab-result/<int:result_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin', 'lab_technician'])
+def edit_lab_result(result_id):
+    lab_result = LabResult.query.get_or_404(result_id)
+    bill_item = lab_result.bill_item
+    
+    if request.method == 'POST':
+        lab_result.result_value = request.form.get('result_value')
+        lab_result.reference_range = request.form.get('reference_range')
+        lab_result.status = request.form.get('status')
+        lab_result.performed_by = request.form.get('performed_by')
+        performed_at = request.form.get('performed_at')
+        lab_result.performed_at = datetime.strptime(performed_at, '%Y-%m-%dT%H:%M') if performed_at else None
+        lab_result.remarks = request.form.get('remarks')
+        
+        db.session.commit()
+        flash('Lab result updated successfully!', 'success')
+        return redirect(url_for('lab_results'))
+    
+    return render_template('add_lab_result.html', bill_item=bill_item, lab_result=lab_result)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        # Redirect to appropriate dashboard based on role
+        if current_user.role == 'admin':
+            return redirect(url_for('index'))
+        elif current_user.role == 'doctor':
+            return redirect(url_for('patient'))
+        elif current_user.role == 'lab_technician':
+            return redirect(url_for('lab_results'))  # Create this route
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        # Check if user exists
+        user = User.query.filter_by(username=username).first()
+        
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
+            
+            # Redirect to appropriate dashboard based on role
+            if user.role == 'admin':
+                return redirect(url_for('index'))
+            elif user.role == 'doctor':
+                return redirect(url_for('patient'))
+            elif user.role == 'lab_technician':
+                return redirect(url_for('lab_results'))  # Create this route
+        else:
+            flash('Invalid username or password', 'error')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('You have been logged out.', 'success')
+    return redirect(url_for('login'))
+
+@app.route('/lab-technicians')
+@login_required
+@role_required(['admin'])
+def lab_technicians():
+    technicians = LabTechnician.query.all()
+    return render_template('lab_technicians.html', technicians=technicians)
+
+@app.route('/add-lab-technician', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def add_lab_technician():
+    if request.method == 'POST':
+        try:
+            # Extract form data
+            first_name = request.form.get('first_name')
+            last_name = request.form.get('last_name')
+            email = request.form.get('email')
+            phone = request.form.get('phone')
+            password = request.form.get('password')
+            specialization = request.form.get('specialization')
+
+            # Create new lab technician
+            new_technician = LabTechnician(
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                phone=phone,
+                password=generate_password_hash(password),
+                specialization=specialization,
+                status=True
+            )
+
+            # Create corresponding user account
+            new_user = User(
+                username=f"{first_name.lower()}.{last_name.lower()}",
+                email=email,
+                role='lab_technician'
+            )
+            new_user.password_hash = generate_password_hash(password)
+
+            # Add both to session
+            db.session.add(new_technician)
+            db.session.add(new_user)
+            
+            db.session.commit()
+            
+            flash('Lab Technician added successfully!', 'success')
+            return redirect(url_for('lab_technicians'))
+        
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding lab technician: {str(e)}', 'error')
+    
+    return render_template('add_lab_technician.html')
+
+@app.route('/edit-lab-technician/<int:technician_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def edit_lab_technician(technician_id):
+    technician = LabTechnician.query.get_or_404(technician_id)
+    
+    if request.method == 'POST':
+        try:
+            # Update technician details
+            technician.first_name = request.form.get('first_name')
+            technician.last_name = request.form.get('last_name')
+            technician.email = request.form.get('email')
+            technician.phone = request.form.get('phone')
+            technician.specialization = request.form.get('specialization')
+            
+            # Update password if provided
+            new_password = request.form.get('password')
+            if new_password:
+                technician.password = generate_password_hash(new_password)
+                
+                # Update corresponding user account
+                user = User.query.filter_by(email=technician.email).first()
+                if user:
+                    user.password_hash = generate_password_hash(new_password)
+            
+            db.session.commit()
+            
+            flash('Lab Technician updated successfully!', 'success')
+            return redirect(url_for('lab_technicians'))
+        
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating lab technician: {str(e)}', 'error')
+    
+    return render_template('edit_lab_technician.html', technician=technician)
+
+@app.route('/delete-lab-technician/<int:technician_id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_lab_technician(technician_id):
+    technician = LabTechnician.query.get_or_404(technician_id)
+    
+    try:
+        # Delete corresponding user account
+        user = User.query.filter_by(email=technician.email).first()
+        if user:
+            db.session.delete(user)
+        
+        # Delete lab technician
+        db.session.delete(technician)
+        db.session.commit()
+        
+        flash('Lab Technician deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting lab technician: {str(e)}', 'error')
+    
+    return redirect(url_for('lab_technicians'))
 
 if __name__ == '__main__':
     app.run(debug=True)

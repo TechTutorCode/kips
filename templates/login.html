@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-wrapper">
+    <div class="content">
+        <div class="row">
+            <div class="col-lg-6 offset-lg-3">
+                <div class="login-box">
+                    <div class="login-logo">
+                        <a href="#"><img src="{{ url_for('static', filename='img/logo.png') }}" alt="Hospital Management System"></a>
+                    </div>
+                    <div class="login-form">
+                        <form method="POST" action="{{ url_for('login') }}" id="loginForm">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" class="form-control" name="username" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <input type="password" class="form-control" name="password" required>
+                            </div>
+                            <div class="form-group text-center">
+                                <button type="submit" class="btn btn-primary btn-block">Login</button>
+                            </div>
+                        </form>
+                        
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                    <div class="alert alert-{{ category }}">
+                                        {{ message }}
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    // Prevent multiple form submissions
+    var submitButton = this.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    
+    // Optional: Add a loading spinner
+    submitButton.innerHTML = 'Logging in... <i class="fa fa-spinner fa-spin"></i>';
+});
+</script>
+{% endblock %}

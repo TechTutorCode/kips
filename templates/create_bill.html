@@ -71,9 +71,12 @@
                                                 <div style="display: none;" class="pharmacy-options">
                                                     {% for item in pharmacy_items %}
                                                     <option value="{{ item.id }}" data-type="Pharmacy"
-                                                        data-price="{{ item.cost_per_unit }}"
-                                                        data-desc="{{ item.description }}" class="pharmacy-item">{{
-                                                        item.name }}</option>
+                                                        data-name="{{ item.name }}"
+                                                        data-description="{{ item.description }}"
+                                                        data-cost="{{ item.cost_per_unit }}"
+                                                        data-stock="{{ item.quantity }}">
+                                                        {{ item.name }} (Stock: {{ item.quantity }})
+                                                    </option>
                                                     {% endfor %}
                                                 </div>
                                                 <div style="display: none;" class="consultation-option">
@@ -180,12 +183,15 @@
             const row = $(this).closest('tr');
             const selectedOption = $(this).find('option:selected');
             
-            const price = selectedOption.data('price') || 0;
-            const description = selectedOption.data('desc') || selectedOption.text();
+            const price = selectedOption.data('cost') || selectedOption.data('price') || 0;
+            const description = selectedOption.data('description') || selectedOption.data('desc') || selectedOption.text();
             
             row.find('.item-description').val(description);
             row.find('.item-price').val(price);
+            row.find('.item-quantity').attr('max', selectedOption.data('stock') || 9999);
+            
             updateRowTotal(row);
+            calculateTotal();
         });
 
         // Add new row

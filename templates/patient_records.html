@@ -114,6 +114,78 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Lab Results Section -->
+        <div class="card-box mb-0">
+            <h3 class="card-title">Lab Results</h3>
+            <div class="table-responsive">
+                <table class="table table-striped custom-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Lab Service</th>
+                            <th>Result</th>
+                            <th>Reference Range</th>
+                            <th>Status</th>
+                            <th>Performed By</th>
+                            <th>Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lab_service in lab_results %}
+                        <tr>
+                            <td>{{ lab_service.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ lab_service.description }}</td>
+                            <td>
+                                {% if lab_service.lab_result %}
+                                    {{ lab_service.lab_result[0].result_value }}
+                                {% else %}
+                                    <span class="text-muted">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if lab_service.lab_result %}
+                                    {{ lab_service.lab_result[0].reference_range or '-' }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if lab_service.lab_result %}
+                                    {% if lab_service.lab_result[0].status == 'Completed' %}
+                                        <span class="custom-badge status-green">{{ lab_service.lab_result[0].status }}</span>
+                                    {% else %}
+                                        <span class="custom-badge status-orange">{{ lab_service.lab_result[0].status }}</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="custom-badge status-red">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if lab_service.lab_result %}
+                                    {{ lab_service.lab_result[0].performed_by or '-' }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if lab_service.lab_result %}
+                                    {{ lab_service.lab_result[0].remarks or '-' }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center">No lab results available</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
+</div>
 </div>
 {% endblock %}
