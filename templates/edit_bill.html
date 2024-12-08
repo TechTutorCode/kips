@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-wrapper">
+    <!-- Hidden templates for new rows -->
+    <div id="optionTemplates" style="display: none;">
+        <div class="lab-options">
+            {% for service in lab_services %}
+            <option value="{{ service.id }}" data-type="Lab Service" data-price="{{ service.cost }}" data-desc="{{ service.description }}" class="lab-item">{{ service.name }}</option>
+            {% endfor %}
+        </div>
+        <div class="pharmacy-options">
+            {% for item in pharmacy_items %}
+            <option value="{{ item.id }}" data-type="Pharmacy" data-price="{{ item.cost_per_unit }}" data-desc="{{ item.description }}" class="pharmacy-item">{{ item.name }}</option>
+            {% endfor %}
+        </div>
+        <div class="consultation-option">
+            <option value="CONS-1" data-type="Consultation" data-price="500" data-desc="General consultation fee" class="consultation-item">Consultation Fee</option>
+        </div>
+    </div>
+
+    <div class="content">
+        <!-- Rest of your existing content -->
+        <div class="row">
+            <div class="col-lg-8 offset-lg-2">
+                <h4 class="page-title">Edit Bill</h4>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-8 offset-lg-2">
+                <form id="billForm" method="POST">
+                    <!-- Your existing form fields -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Patient</label>
+                                <select class="form-control" name="patient_id" required disabled>
+                                    <option value="">Select Patient</option>
+                                    {% for patient in patients %}
+                                    <option value="{{ patient.id }}" {% if patient.id == bill.patient_id %}selected{% endif %}>
+                                        {{ patient.first_name }} {{ patient.last_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Bill Date</label>
+                                <input class="form-control" type="date" name="bill_date" value="{{ bill.bill_date }}" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="table-responsive">
+                                <table class="table table-hover table-white" id="billItems">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Item</th>
+                                            <th>Description</th>
+                                            <th>Quantity</th>
+                                            <th>Unit Price</th>
+                                            <th>Total</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in bill_items %}
+                                        <tr class="existing-item">
+                                            <td>
+                                                <input type="hidden" name="bill_item_id[]" value="{{ item.id }}">
+                                                <input type="hidden" name="item_type[]" value="{{ item.item_type }}">
+                                                <input type="text" class="form-control" value="{{ item.item_type }}" readonly>
+                                            </td>
+                                            <td>
+                                                <input type="hidden" name="item_id[]" value="{{ item.item_id }}">
+                                                <input type="text" class="form-control" value="{{ item.description }}" readonly>
+                                            </td>
+                                            <td>
+                                                <input type="hidden" name="description[]" value="{{ item.description }}">
+                                                <input type="text" class="form-control" value="{{ item.description }}" readonly>
+                                            </td>
+                                            <td>
+                                                <input type="hidden" name="quantity[]" value="{{ item.quantity }}">
+                                                <input type="text" class="form-control" value="{{ item.quantity }}" readonly>
+                                            </td>
+                                            <td>
+                                                <input type="hidden" name="unit_price[]" value="{{ item.unit_price }}">
+                                                <input type="text" class="form-control" value="{{ item.unit_price }}" readonly>
+                                            </td>
+                                            <td>
+                                                <input type="hidden" name="total_price[]" value="{{ item.total_price }}">
+                                                <input type="text" class="form-control" value="{{ item.total_price }}" readonly>
+                                            </td>
+                                            <td>
+                                                <button type="button" class="btn btn-danger btn-sm delete-row"><i class="fa fa-trash"></i></button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="add-more">
+                                <a href="javascript:void(0);" class="add-more-btn" id="addRow">+ Add More</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Total Amount</label>
+                                <input class="form-control" type="number" step="0.01" id="totalAmount" name="total_amount" readonly value="{{ bill.total_amount }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="m-t-20 text-center">
+                        <button class="btn btn-primary submit-btn">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Store options HTML from templates
+        const labOptions = $('#optionTemplates .lab-options').html();
+        const pharmacyOptions = $('#optionTemplates .pharmacy-options').html();
+        const consultationOption = $('#optionTemplates .consultation-option').html();
+        
+        // New row template
+        const newRowTemplate = `
+            <tr>
+                <td>
+                    <input type="hidden" name="bill_item_id[]" value="">
+                    <select class="form-control item-type" name="item_type[]" required>
+                        <option value="">Select Type</option>
+                        <option value="Lab Service">Lab Service</option>
+                        <option value="Pharmacy">Pharmacy</option>
+                        <option value="Consultation">Consultation</option>
+                    </select>
+                </td>
+                <td>
+                    <select class="form-control item-select" name="item_id[]" required>
+                        <option value="">Select Item</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="text" class="form-control item-description" name="description[]" required readonly>
+                </td>
+                <td>
+                    <input type="number" class="form-control item-quantity" name="quantity[]" value="1" min="1" required>
+                </td>
+                <td>
+                    <input type="number" step="0.01" class="form-control item-price" name="unit_price[]" required readonly>
+                </td>
+                <td>
+                    <input type="number" step="0.01" class="form-control item-total" name="total_price[]" readonly>
+                </td>
+                <td>
+                    <button type="button" class="btn btn-danger btn-sm delete-row"><i class="fa fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+        
+        // Handle item type change (only for new rows)
+        $(document).on('change', '.item-type', function() {
+            const row = $(this).closest('tr');
+            if (row.hasClass('existing-item')) return; // Skip for existing items
+            
+            const itemSelect = row.find('.item-select');
+            const itemType = $(this).val();
+            
+            console.log('Type changed to:', itemType); // Debug
+            
+            // Reset select to only show default option
+            itemSelect.find('option:not(:first)').remove();
+            itemSelect.val('');
+            
+            // Add appropriate options
+            if (itemType === 'Lab Service') {
+                console.log('Adding lab options:', labOptions); // Debug
+                itemSelect.append(labOptions);
+            } else if (itemType === 'Pharmacy') {
+                console.log('Adding pharmacy options:', pharmacyOptions); // Debug
+                itemSelect.append(pharmacyOptions);
+            } else if (itemType === 'Consultation') {
+                console.log('Adding consultation option:', consultationOption); // Debug
+                itemSelect.append(consultationOption);
+            }
+            
+            // Clear fields
+            row.find('.item-description').val('');
+            row.find('.item-price').val('');
+            row.find('.item-total').val('');
+            calculateTotal();
+        });
+
+        // Handle item selection (only for new rows)
+        $(document).on('change', '.item-select', function() {
+            const row = $(this).closest('tr');
+            if (row.hasClass('existing-item')) return; // Skip for existing items
+            
+            const selectedOption = $(this).find('option:selected');
+            const price = selectedOption.data('price') || 0;
+            const description = selectedOption.data('desc') || selectedOption.text();
+            
+            row.find('.item-description').val(description);
+            row.find('.item-price').val(price);
+            updateRowTotal(row);
+        });
+
+        // Add new row
+        $('#addRow').click(function() {
+            $('#billItems tbody').append(newRowTemplate);
+        });
+
+        // Delete row
+        $(document).on('click', '.delete-row', function() {
+            $(this).closest('tr').remove();
+            calculateTotal();
+        });
+
+        // Handle quantity change (only for new rows)
+        $(document).on('change', '.item-quantity', function() {
+            const row = $(this).closest('tr');
+            if (row.hasClass('existing-item')) return; // Skip for existing items
+            
+            const quantity = parseInt($(this).val()) || 0;
+            if (quantity < 1) {
+                $(this).val(1);
+            }
+            updateRowTotal(row);
+        });
+
+        // Update row total (only for new rows)
+        function updateRowTotal(row) {
+            if (row.hasClass('existing-item')) return; // Skip for existing items
+            
+            const quantity = parseFloat(row.find('.item-quantity').val()) || 0;
+            const price = parseFloat(row.find('.item-price').val()) || 0;
+            const total = quantity * price;
+            row.find('.item-total').val(total.toFixed(2));
+            calculateTotal();
+        }
+
+        // Calculate total amount
+        function calculateTotal() {
+            let total = 0;
+            $('.item-total').each(function() {
+                total += parseFloat($(this).val()) || 0;
+            });
+            $('#totalAmount').val(total.toFixed(2));
+        }
+
+        // Form validation before submit
+        $('#billForm').on('submit', function(e) {
+            e.preventDefault();
+            
+            // Check if at least one item exists
+            if ($('#billItems tbody tr').length < 1) {
+                alert('Please add at least one item to the bill');
+                return false;
+            }
+            
+            // Check if new items are properly filled
+            let isValid = true;
+            $('#billItems tbody tr:not(.existing-item)').each(function() {
+                const row = $(this);
+                if (!row.find('.item-type').val() || 
+                    !row.find('.item-select').val() || 
+                    !row.find('.item-description').val() || 
+                    !row.find('.item-quantity').val() || 
+                    !row.find('.item-price').val() || 
+                    !row.find('.item-total').val()) {
+                    isValid = false;
+                    return false;
+                }
+            });
+            
+            if (!isValid) {
+                alert('Please fill in all new item details correctly');
+                return false;
+            }
+            
+            // Submit the form if everything is valid
+            this.submit();
+        });
+    });
+</script>
+{% endblock %}

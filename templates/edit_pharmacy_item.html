@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-wrapper">
+    <div class="content">
+        <div class="row">
+            <div class="col-lg-8 offset-lg-2">
+                <h4 class="page-title">Edit Pharmacy Item</h4>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-8 offset-lg-2">
+                <form action="{{ url_for('edit_pharmacy_item', item_id=item.id) }}" method="POST">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Item Name <span class="text-danger">*</span></label>
+                                <input class="form-control" type="text" name="name" value="{{ item.name }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Category <span class="text-danger">*</span></label>
+                                <select class="form-control" name="category" required>
+                                    <option value="">Select Category</option>
+                                    <option value="Medicine" {% if item.category == 'Medicine' %}selected{% endif %}>Medicine</option>
+                                    <option value="Equipment" {% if item.category == 'Equipment' %}selected{% endif %}>Equipment</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Unit <span class="text-danger">*</span></label>
+                                <select class="form-control" name="unit" required>
+                                    <option value="">Select Unit</option>
+                                    <option value="Tablets" {% if item.unit == 'Tablets' %}selected{% endif %}>Tablets</option>
+                                    <option value="Pieces" {% if item.unit == 'Pieces' %}selected{% endif %}>Pieces</option>
+                                    <option value="Bottles" {% if item.unit == 'Bottles' %}selected{% endif %}>Bottles</option>
+                                    <option value="Boxes" {% if item.unit == 'Boxes' %}selected{% endif %}>Boxes</option>
+                                    <option value="Strips" {% if item.unit == 'Strips' %}selected{% endif %}>Strips</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Quantity <span class="text-danger">*</span></label>
+                                <input class="form-control" type="number" name="quantity" value="{{ item.quantity }}" min="0" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Cost per Unit (KES) <span class="text-danger">*</span></label>
+                                <input class="form-control" type="number" step="0.01" name="cost_per_unit" value="{{ item.cost_per_unit }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Reorder Level</label>
+                                <input class="form-control" type="number" name="reorder_level" value="{{ item.reorder_level }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea class="form-control" name="description" rows="3">{{ item.description }}</textarea>
+                    </div>
+                    <div class="m-t-20 text-center">
+                        <button class="btn btn-primary submit-btn">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

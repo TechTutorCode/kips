@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-wrapper">
+    <div class="content">
+        <div class="row">
+            <div class="col-lg-8 offset-lg-2">
+                <h4 class="page-title">Edit Patient Record</h4>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-8 offset-lg-2">
+                <form action="/edit-record/{{ record.id }}" method="post">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Patient Name</label>
+                                <input class="form-control" type="text" value="{{ record.patient.first_name }} {{ record.patient.last_name }}" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Doctor</label>
+                                <select class="form-control" name="doctor_id" required>
+                                    <option value="">Select Doctor</option>
+                                    {% for doctor in doctors %}
+                                    <option value="{{ doctor.id }}" {% if doctor.id == record.doctor_id %}selected{% endif %}>
+                                        Dr. {{ doctor.first_name }} {{ doctor.last_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Diagnosis <span class="text-danger">*</span></label>
+                                <textarea class="form-control" name="diagnosis" rows="3" required>{{ record.diagnosis }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Prescription</label>
+                                <textarea class="form-control" name="prescription" rows="3">{{ record.prescription }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label>Notes</label>
+                                <textarea class="form-control" name="notes" rows="3">{{ record.notes }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Next Visit Date</label>
+                                <div class="cal-icon">
+                                    <input type="date" class="form-control" name="next_visit" value="{{ record.next_visit.strftime('%Y-%m-%d') if record.next_visit }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="m-t-20 text-center">
+                        <button class="btn btn-primary submit-btn">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

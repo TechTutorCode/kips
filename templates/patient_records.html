@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-wrapper">
+    <div class="content">
+        <div class="row">
+            <div class="col-sm-7 col-6">
+                <h4 class="page-title">Patient Records</h4>
+            </div>
+            <div class="col-sm-5 col-6 text-right m-b-30">
+                <a href="/add-record/{{ patient.id }}" class="btn btn-primary btn-rounded"><i class="fa fa-plus"></i> Add Record</a>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card-box">
+                    <h4 class="card-title">Patient Information</h4>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <p><strong>Name:</strong> {{ patient.first_name }} {{ patient.last_name }}</p>
+                            <p><strong>Gender:</strong> {{ patient.gender }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>Phone:</strong> {{ patient.phone }}</p>
+                            <p><strong>Email:</strong> {{ patient.email if patient.email else '-' }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>Address:</strong> {{ patient.address if patient.address else '-' }}</p>
+                            <p><strong>Date of Birth:</strong> {{ patient.dob.strftime('%Y-%m-%d') if patient.dob else '-' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card-box">
+                    <h4 class="card-title">Medical Records</h4>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Doctor</th>
+                                    <th>Diagnosis</th>
+                                    <th>Prescription</th>
+                                    <th>Next Visit</th>
+                                    <th class="text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in records %}
+                                <tr>
+                                    <td>{{ record.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>Dr. {{ record.doctor.first_name }} {{ record.doctor.last_name }}</td>
+                                    <td>{{ record.diagnosis[:50] + '...' if record.diagnosis|length > 50 else record.diagnosis }}</td>
+                                    <td>{{ record.prescription[:50] + '...' if record.prescription and record.prescription|length > 50 else record.prescription or '-' }}</td>
+                                    <td>{{ record.next_visit.strftime('%Y-%m-%d') if record.next_visit else '-' }}</td>
+                                    <td class="text-right">
+                                        <div class="dropdown dropdown-action">
+                                            <a href="#" class="action-icon dropdown-toggle" data-toggle="dropdown" aria-expanded="false"><i class="fa fa-ellipsis-v"></i></a>
+                                            <div class="dropdown-menu dropdown-menu-right">
+                                                <a class="dropdown-item" href="/edit-record/{{ record.id }}">
+                                                    <i class="fa fa-pencil m-r-5"></i> Edit
+                                                </a>
+                                                <a class="dropdown-item" href="#" data-toggle="modal" data-target="#view_record_{{ record.id }}">
+                                                    <i class="fa fa-eye m-r-5"></i> View
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <!-- View Record Modal -->
+                                <div id="view_record_{{ record.id }}" class="modal fade" role="dialog">
+                                    <div class="modal-dialog modal-lg">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Record Details</h5>
+                                                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <p><strong>Date:</strong> {{ record.created_at.strftime('%Y-%m-%d') }}</p>
+                                                        <p><strong>Doctor:</strong> Dr. {{ record.doctor.first_name }} {{ record.doctor.last_name }}</p>
+                                                        <p><strong>Next Visit:</strong> {{ record.next_visit.strftime('%Y-%m-%d') if record.next_visit else '-' }}</p>
+                                                    </div>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-12">
+                                                        <p><strong>Diagnosis:</strong></p>
+                                                        <p>{{ record.diagnosis }}</p>
+                                                    </div>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-12">
+                                                        <p><strong>Prescription:</strong></p>
+                                                        <p>{{ record.prescription or '-' }}</p>
+                                                    </div>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-12">
+                                                        <p><strong>Notes:</strong></p>
+                                                        <p>{{ record.notes or '-' }}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
