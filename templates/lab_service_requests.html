@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-wrapper">
+    <div class="content">
+        <div class="row">
+            <div class="col-lg-12">
+                <h4 class="page-title">Lab Service Requests</h4>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-12">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <div class="table-responsive">
+                    <table class="table table-striped custom-table">
+                        <thead>
+                            <tr>
+                                <th>Request ID</th>
+                                <th>Patient</th>
+                                <th>Lab Service</th>
+                                <th>Doctor</th>
+                                <th>Status</th>
+                                <th>Urgency</th>
+                                <th>Created At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for request in requests %}
+                            <tr>
+                                <td>{{ request.id }}</td>
+                                <td>{{ request.patient.first_name }} {{ request.patient.last_name }}</td>
+                                <td>{{ request.lab_service.name }}</td>
+                                <td>{{ request.doctor.first_name }} {{ request.doctor.last_name }}</td>
+                                <td>
+                                    <span class="badge 
+                                        {% if request.status == 'Pending' %}badge-warning
+                                        {% elif request.status == 'Approved' %}badge-success
+                                        {% elif request.status == 'Completed' %}badge-info
+                                        {% else %}badge-danger{% endif %}">
+                                        {{ request.status }}
+                                    </span>
+                                </td>
+                                <td>{{ request.urgency }}</td>
+                                <td>{{ request.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    {% if current_user.role == 'lab_technician' and request.status == 'Pending' %}
+                                        <a href="{{ url_for('process_lab_service_request', request_id=request.id) }}" 
+                                           class="btn btn-primary btn-sm">Process</a>
+                                    {% endif %}
+                                    <a href="#" class="btn btn-info btn-sm" data-toggle="modal" 
+                                       data-target="#requestDetailsModal{{ request.id }}">View Details</a>
+                                </td>
+                            </tr>
+                            
+                            <!-- Modal for Request Details -->
+                            <div class="modal fade" id="requestDetailsModal{{ request.id }}" tabindex="-1" role="dialog">
+                                <div class="modal-dialog" role="document">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Lab Service Request Details</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p><strong>Patient:</strong> {{ request.patient.first_name }} {{ request.patient.last_name }}</p>
+                                            <p><strong>Lab Service:</strong> {{ request.lab_service.name }}</p>
+                                            <p><strong>Doctor:</strong> {{ request.doctor.first_name }} {{ request.doctor.last_name }}</p>
+                                            <p><strong>Status:</strong> {{ request.status }}</p>
+                                            <p><strong>Urgency:</strong> {{ request.urgency }}</p>
+                                            <p><strong>Clinical Notes:</strong> {{ request.clinical_notes or 'No additional notes' }}</p>
+                                            <p><strong>Created At:</strong> {{ request.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

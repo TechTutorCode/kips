@@ -12,8 +12,8 @@ class LabTechnician(db.Model):
     password = db.Column(db.String(255), nullable=False)  # Store hashed passwords
     specialization = db.Column(db.String(100))
     
-    # Relationship with lab results
-    lab_results = db.relationship('LabResult', backref='technician', lazy='dynamic')
+    # Relationship with lab results (one-to-many)
+    lab_results = db.relationship('LabResult', back_populates='technician', lazy='dynamic')
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.Boolean, default=True)  # Active or Inactive

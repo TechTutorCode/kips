@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-wrapper">
+    <div class="content">
+        <div class="row">
+            <div class="col-sm-12">
+                <h4 class="page-title">Lab Result Details</h4>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 class="card-title">Patient Information</h5>
+                                <p><strong>Name:</strong> {{ result.patient.first_name }} {{ result.patient.last_name }}</p>
+                                <p><strong>Patient ID:</strong> {{ result.patient.id }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h5 class="card-title">Lab Service Details</h5>
+                                <p><strong>Service:</strong> {{ result.bill_item.description }}</p>
+                                <p><strong>Performed At:</strong> {{ result.performed_at.strftime('%Y-%m-%d %H:%M:%S') if result.performed_at else 'Not specified' }}</p>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <h5 class="card-title">Result Details</h5>
+                                <p><strong>Result Value:</strong> {{ result.result_value }}</p>
+                                <p><strong>Reference Range:</strong> {{ result.reference_range or 'Not specified' }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h5 class="card-title">Status</h5>
+                                <p>
+                                    <strong>Status:</strong> 
+                                    <span class="badge 
+                                        {% if result.status == 'Completed' %}badge-success
+                                        {% elif result.status == 'Pending' %}badge-warning
+                                        {% else %}badge-danger
+                                        {% endif %}">
+                                        {{ result.status }}
+                                    </span>
+                                </p>
+                                {% if result.technician %}
+                                <p><strong>Performed By:</strong> {{ result.technician.first_name }} {{ result.technician.last_name }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if result.remarks %}
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <h5 class="card-title">Remarks</h5>
+                                <p>{{ result.remarks }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="row mt-3">
+                            <div class="col-md-12 text-right">
+                                <a href="{{ url_for('lab_results') }}" class="btn btn-secondary">Back to Lab Results</a>
+                                {% if current_user.role in ['admin', 'lab_technician'] %}
+                                <a href="{{ url_for('edit_lab_result', result_id=result.id) }}" class="btn btn-primary">Edit Result</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

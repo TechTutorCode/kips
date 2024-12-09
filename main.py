@@ -30,6 +30,7 @@ from models.lab_services import LabService
 from models.pharmacy import PharmacyItem
 from models.billing import Bill, BillItem, Payment
 from models.lab_technicians import LabTechnician
+from models.lab_service_requests import LabServiceRequest
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -134,39 +135,47 @@ def add_d():
             gender = request.form.get('gender')
             phone = request.form.get('phone')
             
+            # Check if doctor already exists
+            existing_doctor = Doctor.query.filter_by(email=email).first()
+            if existing_doctor:
+                flash('A doctor with this email already exists.', 'error')
+                return redirect(url_for('add_d'))
+            
+            # Hash the password
+            hashed_password = generate_password_hash(password)
+            
             # Create new doctor
             new_doctor = Doctor(
                 first_name=first_name,
                 last_name=last_name,
                 email=email,
-                password=password,
+                password=hashed_password,
                 gender=gender,
                 phone=phone,
                 status=True
             )
+            db.session.add(new_doctor)
+            db.session.flush()  # This will populate the id
             
             # Create corresponding user account
             from models.users import User
             new_user = User(
-                username=f"{first_name.lower()}.{last_name.lower()}",
                 email=email,
-                role='doctor'
+                role='doctor',
+                password=password,
+                doctor_id=new_doctor.id
             )
-            new_user.password_hash = password  # Use the same password
-            
-            # Add both to session
-            db.session.add(new_doctor)
             db.session.add(new_user)
             
             db.session.commit()
             
             flash('Doctor added successfully!', 'success')
-            return redirect(url_for('add_doctor'))
+            return redirect(url_for('add_d'))
         
         except Exception as e:
             db.session.rollback()
             flash(f'Error adding doctor: {str(e)}', 'error')
-            return render_template("add_doctor.html")
+            return redirect(url_for('add_d'))
 
 @app.route('/profile/<int:id>')
 @login_required
@@ -278,17 +287,50 @@ def patient_records(patient_id):
     patient = Patient.query.get_or_404(patient_id)
     records = PatientRecord.query.filter_by(patient_id=patient_id).order_by(PatientRecord.created_at.desc()).all()
     
-    # Get lab results for this patient
-    lab_results = BillItem.query.join(Bill).join(Bill.patient).filter(
-        BillItem.item_type == 'Lab Service',
+    # Get lab results for this patient with 'Completed' status
+    # First, find all bills for this patient
+    bills = Bill.query.filter(
         Bill.patient_id == patient_id,
         Bill.status.in_(['Paid', 'Partial'])
-    ).order_by(BillItem.created_at.desc()).all()
+    ).all()
+    
+    # Collect bill item IDs
+    bill_item_ids = []
+    for bill in bills:
+        bill_item_ids.extend([item.id for item in bill.items if item.item_type == 'Lab Service'])
+    
+    # Find completed lab results for these bill items
+    completed_lab_results = LabResult.query.filter(
+        LabResult.bill_item_id.in_(bill_item_ids),
+        LabResult.status == 'Completed'
+    ).all()
+    
+    # Organize lab results by bill item
+    lab_results_by_bill_item = {}
+    for lab_result in completed_lab_results:
+        bill_item = BillItem.query.get(lab_result.bill_item_id)
+        if bill_item:
+            if bill_item not in lab_results_by_bill_item:
+                lab_results_by_bill_item[bill_item] = []
+            lab_results_by_bill_item[bill_item].append(lab_result)
+    
+    # Convert to list for template
+    completed_lab_results_list = [
+        bill_item for bill_item, results in lab_results_by_bill_item.items()
+    ]
+    
+    # Debug print
+    print(f"Patient ID: {patient_id}")
+    print(f"Total Bills: {len(bills)}")
+    print(f"Bill Item IDs: {bill_item_ids}")
+    print(f"Completed Lab Results: {len(completed_lab_results)}")
+    for bill_item, results in lab_results_by_bill_item.items():
+        print(f"Bill Item ID: {bill_item.id}, Lab Results: {results}")
     
     return render_template('patient_records.html', 
                          patient=patient, 
                          records=records,
-                         lab_results=lab_results)
+                         lab_results=completed_lab_results_list)
 
 @app.route('/add-record/<int:patient_id>', methods=['GET', 'POST'])
 @login_required
@@ -570,7 +612,7 @@ def create_bill():
                     bill_item.total_price = total_prices[i]
                 else:  # Add new item
                     bill_item = BillItem(
-                        bill_id=bill_id,
+                        bill_id=bill.id,
                         item_type=item_types[i],
                         item_id=item_ids[i],
                         quantity=quantities[i],
@@ -746,36 +788,57 @@ def lab_results():
 
 @app.route('/add-lab-result/<int:bill_item_id>', methods=['GET', 'POST'])
 @login_required
-@role_required(['admin', 'lab_technician'])
+@role_required(['lab_technician'])
 def add_lab_result(bill_item_id):
     bill_item = BillItem.query.get_or_404(bill_item_id)
     
-    if request.method == 'POST':
-        result_value = request.form.get('result_value')
-        reference_range = request.form.get('reference_range')
-        status = request.form.get('status')
-        performed_by = request.form.get('performed_by')
-        performed_at = request.form.get('performed_at')
-        remarks = request.form.get('remarks')
-        
-        # Create lab result
-        lab_result = LabResult(
-            bill_item_id=bill_item.id,
-            result_value=result_value,
-            reference_range=reference_range,
-            status=status,
-            performed_by=performed_by,
-            performed_at=datetime.strptime(performed_at, '%Y-%m-%dT%H:%M') if performed_at else None,
-            remarks=remarks
-        )
-        
-        db.session.add(lab_result)
-        db.session.commit()
-        
-        flash('Lab result added successfully!', 'success')
-        return redirect(url_for('lab_results'))
+    # Find the associated lab service request
+    lab_service_request = LabServiceRequest.query.filter_by(bill_id=bill_item.bill_id).first()
     
-    return render_template('add_lab_result.html', bill_item=bill_item, lab_result=None)
+    if not lab_service_request:
+        flash('No associated lab service request found.', 'danger')
+        return redirect(url_for('pending_lab_service_requests'))
+    
+    # Ensure the lab technician can only add results for their own service
+    if request.method == 'POST':
+        try:
+            # Find the current logged-in lab technician by email
+            current_lab_tech = LabTechnician.query.filter_by(email=current_user.email).first()
+            
+            if not current_lab_tech:
+                flash('Lab technician profile not found.', 'danger')
+                return redirect(url_for('pending_lab_service_requests'))
+            
+            # Create new lab result
+            new_lab_result = LabResult(
+                bill_item_id=bill_item_id,
+                technician_id=current_lab_tech.id,
+                result_value=request.form.get('result_value', ''),
+                reference_range=request.form.get('reference_range', ''),
+                remarks=request.form.get('remarks', ''),
+                status='Completed',
+                performed_at=datetime.utcnow()
+            )
+            
+            db.session.add(new_lab_result)
+            db.session.commit()
+            
+            flash('Lab result added successfully!', 'success')
+            return redirect(url_for('lab_results'))
+        
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding lab result: {str(e)}', 'danger')
+            print(f"Full Error: {e}")
+    
+    # Get the lab service details for the bill item
+    lab_service = lab_service_request.lab_service
+    patient = bill_item.bill.patient
+    
+    return render_template('add_lab_result.html', 
+                           bill_item=bill_item, 
+                           lab_service=lab_service, 
+                           patient=patient)
 
 @app.route('/edit-lab-result/<int:result_id>', methods=['GET', 'POST'])
 @login_required
@@ -804,31 +867,35 @@ def login():
     if current_user.is_authenticated:
         # Redirect to appropriate dashboard based on role
         if current_user.role == 'admin':
-            return redirect(url_for('index'))
+            return redirect(url_for('lab_services'))  # Redirect to lab services for admin
         elif current_user.role == 'doctor':
             return redirect(url_for('patient'))
         elif current_user.role == 'lab_technician':
-            return redirect(url_for('lab_results'))  # Create this route
+            return redirect(url_for('lab_results'))
     
     if request.method == 'POST':
-        username = request.form.get('username')
+        email = request.form.get('email')
         password = request.form.get('password')
         
         # Check if user exists
-        user = User.query.filter_by(username=username).first()
+        user = User.query.filter_by(email=email).first()
         
-        if user and check_password_hash(user.password_hash, password):
+        if user and user.check_password(password):
+            # Update last login time
+            user.last_login = datetime.utcnow()
+            db.session.commit()
+            
             login_user(user)
             
             # Redirect to appropriate dashboard based on role
             if user.role == 'admin':
-                return redirect(url_for('index'))
+                return redirect(url_for('lab_services'))  # Redirect to lab services for admin
             elif user.role == 'doctor':
                 return redirect(url_for('patient'))
             elif user.role == 'lab_technician':
-                return redirect(url_for('lab_results'))  # Create this route
+                return redirect(url_for('lab_results'))
         else:
-            flash('Invalid username or password', 'error')
+            flash('Invalid email or password', 'error')
     
     return render_template('login.html')
 
@@ -952,6 +1019,208 @@ def delete_lab_technician(technician_id):
         flash(f'Error deleting lab technician: {str(e)}', 'error')
     
     return redirect(url_for('lab_technicians'))
+
+@app.route('/request-lab-service', methods=['GET', 'POST'])
+@login_required
+@role_required(['doctor'])
+def request_lab_service():
+    if request.method == 'GET':
+        # Get list of patients and lab services for the form
+        patients = Patient.query.all()
+        lab_services = LabService.query.all()
+        return render_template('request_lab_service.html', 
+                               patients=patients, 
+                               lab_services=lab_services)
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            patient_id = request.form.get('patient_id')
+            lab_service_id = request.form.get('lab_service_id')
+            clinical_notes = request.form.get('clinical_notes')
+            urgency = request.form.get('urgency', 'Normal')
+            
+            # Validate inputs
+            if not patient_id or not lab_service_id:
+                flash('Patient and Lab Service are required.', 'error')
+                return redirect(url_for('request_lab_service'))
+            
+            # Create lab service request
+            new_request = LabServiceRequest(
+                doctor_id=current_user.doctor.id,  # Assuming current user is a doctor
+                patient_id=patient_id,
+                lab_service_id=lab_service_id,
+                clinical_notes=clinical_notes,
+                urgency=urgency,
+                status='Pending'
+            )
+            
+            db.session.add(new_request)
+            db.session.commit()
+            
+            flash('Lab service request submitted successfully!', 'success')
+            return redirect(url_for('request_lab_service'))
+        
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error submitting lab service request: {str(e)}', 'error')
+            return redirect(url_for('request_lab_service'))
+
+@app.route('/lab-service-requests', methods=['GET'])
+@login_required
+@role_required(['doctor', 'admin', 'lab_technician'])
+def view_lab_service_requests():
+    # Filter requests based on user role
+    if current_user.role == 'doctor':
+        requests = LabServiceRequest.query.filter_by(doctor_id=current_user.doctor.id).all()
+    elif current_user.role == 'lab_technician':
+        requests = LabServiceRequest.query.filter_by(status='Pending').all()
+    else:  # admin
+        requests = LabServiceRequest.query.all()
+    
+    return render_template('lab_service_requests.html', requests=requests)
+
+@app.route('/process-lab-service-request/<int:request_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['lab_technician'])
+def process_lab_service_request(request_id):
+    # Find the lab service request
+    lab_service_request = LabServiceRequest.query.get_or_404(request_id)
+    
+    if request.method == 'GET':
+        # Show processing form
+        return render_template('process_lab_service_request.html', request=lab_service_request)
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            action = request.form.get('action')
+            notes = request.form.get('notes')
+            
+            # Update request status
+            if action == 'approve':
+                # Create bill for the lab service
+                # Find the lab service
+                lab_service = LabService.query.get(lab_service_request.lab_service_id)
+                
+                # Find the current user's lab technician ID (if exists)
+                current_lab_technician = None
+                if current_user.role == 'lab_technician':
+                    current_lab_technician = LabTechnician.query.filter_by(email=current_user.email).first()
+                
+                # Create bill first
+                bill = Bill(
+                    patient_id=lab_service_request.patient_id,
+                    total_amount=lab_service.cost,
+                    status='Unpaid'
+                )
+                db.session.add(bill)
+                db.session.flush()  # This will populate the bill.id
+                
+                # Create bill item
+                bill_item = BillItem(
+                    bill_id=bill.id,  # Use the bill's ID
+                    item_type='Lab Service',
+                    item_id=lab_service.id,
+                    description=lab_service.name,
+                    unit_price=lab_service.cost,
+                    total_price=lab_service.cost,
+                    quantity=1
+                )
+                db.session.add(bill_item)
+                db.session.flush()  # Ensure bill_item has an ID
+                
+                # Add bill items to the bill
+                bill.bill_items = [bill_item]
+                
+                # Create lab result entry
+                lab_result = LabResult(
+                    bill_item_id=bill_item.id,
+                    technician_id=current_lab_technician.id if current_lab_technician else None,
+                    result_value='Pending',
+                    status='Pending',
+                    remarks=notes or 'Lab service request approved',
+                    performed_at=datetime.utcnow()
+                )
+                db.session.add(lab_result)
+                
+                # Update lab service request status and link bill
+                lab_service_request.status = 'Approved'
+                lab_service_request.bill_id = bill.id
+                
+                # Commit all changes
+                db.session.commit()
+                
+                flash('Lab service request approved. Bill created and lab result prepared.', 'success')
+            elif action == 'reject':
+                lab_service_request.status = 'Rejected'
+                
+                # Add notes for rejection
+                if notes:
+                    lab_service_request.clinical_notes = (lab_service_request.clinical_notes or '') + f"\n\nRejection Notes: {notes}"
+                
+                db.session.commit()
+                flash('Lab service request rejected.', 'warning')
+            
+            return redirect(url_for('view_lab_service_requests'))
+        
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error processing lab service request: {str(e)}', 'error')
+            return redirect(url_for('process_lab_service_request', request_id=request_id))
+
+@app.route('/view_lab_result/<int:result_id>', methods=['GET'])
+@login_required
+def view_lab_result(result_id):
+    # Check user permissions
+    if current_user.role not in ['admin', 'doctor', 'lab_technician']:
+        flash('You do not have permission to view lab results.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Find the lab result
+    lab_result = LabResult.query.get_or_404(result_id)
+    
+    # If user is a doctor, ensure they are associated with the patient
+    if current_user.role == 'doctor':
+        # Find the doctor by email
+        doctor = Doctor.query.filter_by(email=current_user.email).first()
+        
+        # Validate doctor exists
+        if not doctor:
+            flash('Doctor profile not found.', 'danger')
+            return redirect(url_for('index'))
+    
+    return render_template('view_lab_result.html', result=lab_result)
+
+@app.route('/pending-lab-service-requests', methods=['GET'])
+@login_required
+@role_required(['lab_technician'])
+def pending_lab_service_requests():
+    # Find approved lab service requests that need lab results
+    pending_requests = LabServiceRequest.query.filter(
+        LabServiceRequest.status == 'Approved',
+        LabServiceRequest.bill_id.isnot(None)
+    ).all()
+    
+    # Filter out requests that already have completed lab results
+    filtered_requests = []
+    for request in pending_requests:
+        # Check if the bill associated with this request has any bill items
+        bill = Bill.query.get(request.bill_id)
+        if bill and bill.items:
+            # Check if any bill item has a completed lab result
+            has_completed_result = False
+            for item in bill.items:
+                # Check if the bill item has a lab result
+                lab_result = LabResult.query.filter_by(bill_item_id=item.id).first()
+                if lab_result and lab_result.status == 'Completed':
+                    has_completed_result = True
+                    break
+            
+            if not has_completed_result:
+                filtered_requests.append(request)
+    
+    return render_template('pending_lab_service_requests.html', requests=filtered_requests)
 
 if __name__ == '__main__':
     app.run(debug=True)

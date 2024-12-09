@@ -53,21 +53,15 @@
                                         -
                                     {% endif %}
                                 </td>
-                                <td>{{ result.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ result.performed_at.strftime('%Y-%m-%d %H:%M:%S') if result.performed_at else '-' }}</td>
                                 <td class="text-right">
                                     <div class="dropdown dropdown-action">
-                                        <a href="#" class="action-icon dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
-                                            <i class="fa fa-ellipsis-v"></i>
-                                        </a>
+                                        <a href="#" class="action-icon dropdown-toggle" data-toggle="dropdown" aria-expanded="false"><i class="fa fa-ellipsis-v"></i></a>
                                         <div class="dropdown-menu dropdown-menu-right">
-                                            {% if current_user.role == 'admin' or (current_user.role == 'lab_technician' and result.status != 'Completed') %}
-                                            <a class="dropdown-item" href="{{ url_for('edit_lab_result', result_id=result.id) }}">
-                                                <i class="fa fa-pencil m-r-5"></i> Edit
-                                            </a>
+                                            <a class="dropdown-item" href="{{ url_for('view_lab_result', result_id=result.id) }}"><i class="fa fa-eye m-r-5"></i> View</a>
+                                            {% if current_user.role in ['admin', 'lab_technician'] %}
+                                            <a class="dropdown-item" href="{{ url_for('edit_lab_result', result_id=result.id) }}"><i class="fa fa-pencil m-r-5"></i> Edit</a>
                                             {% endif %}
-                                            <a class="dropdown-item" href="{{ url_for('view_lab_result', result_id=result.id) }}">
-                                                <i class="fa fa-eye m-r-5"></i> View
-                                            </a>
                                         </div>
                                     </div>
                                 </td>

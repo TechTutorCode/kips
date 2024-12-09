@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-wrapper">
+    <div class="content">
+        <div class="row">
+            <div class="col-lg-8 offset-lg-2">
+                <h4 class="page-title">Process Lab Service Request</h4>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-8 offset-lg-2">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Request Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Patient:</strong> {{ request.patient.first_name }} {{ request.patient.last_name }}</p>
+                        <p><strong>Lab Service:</strong> {{ request.lab_service.name }}</p>
+                        <p><strong>Doctor:</strong> {{ request.doctor.first_name }} {{ request.doctor.last_name }}</p>
+                        <p><strong>Urgency:</strong> {{ request.urgency }}</p>
+                        <p><strong>Original Clinical Notes:</strong> {{ request.clinical_notes or 'No notes' }}</p>
+                    </div>
+                </div>
+                
+                <form action="{{ url_for('process_lab_service_request', request_id=request.id) }}" method="post">
+                    <div class="row">
+                        <div class="col-sm-12">
+                            <div class="form-group">
+                                <label>Additional Notes</label>
+                                <textarea class="form-control" name="notes" rows="4" placeholder="Enter any additional notes or observations"></textarea>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <button type="submit" name="action" value="approve" class="btn btn-success btn-block">
+                                    <i class="fa fa-check"></i> Approve Request
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <button type="submit" name="action" value="reject" class="btn btn-danger btn-block">
+                                    <i class="fa fa-times"></i> Reject Request
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

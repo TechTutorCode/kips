@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-wrapper">
+    <div class="content">
+        <div class="row">
+            <div class="col-sm-4 col-3">
+                <h4 class="page-title">Pending Lab Service Requests</h4>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <div class="table-responsive">
+                    <table class="table table-striped custom-table datatable">
+                        <thead>
+                            <tr>
+                                <th>Patient</th>
+                                <th>Lab Service</th>
+                                <th>Requested By</th>
+                                <th>Request Date</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for request in requests %}
+                            <tr>
+                                <td>
+                                    {{ request.patient.first_name }} {{ request.patient.last_name }}
+                                </td>
+                                <td>
+                                    {{ request.lab_service.name }}
+                                </td>
+                                <td>
+                                    {{ request.doctor.first_name }} {{ request.doctor.last_name }}
+                                </td>
+                                <td>
+                                    {{ request.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                </td>
+                                <td>
+                                    {% if request.bill %}
+                                    <a href="{{ url_for('add_lab_result', bill_item_id=request.bill.id) }}" 
+                                       class="btn btn-primary btn-sm">
+                                        <i class="fa fa-plus"></i> Add Result
+                                    </a>
+                                    {% else %}
+                                    <span class="text-warning">No bill found</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center">
+                                    No pending lab service requests found.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

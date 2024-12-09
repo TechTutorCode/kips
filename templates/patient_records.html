@@ -128,57 +128,43 @@
                             <th>Reference Range</th>
                             <th>Status</th>
                             <th>Performed By</th>
-                            <th>Remarks</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for lab_service in lab_results %}
-                        <tr>
-                            <td>{{ lab_service.created_at.strftime('%Y-%m-%d') }}</td>
-                            <td>{{ lab_service.description }}</td>
-                            <td>
-                                {% if lab_service.lab_result %}
-                                    {{ lab_service.lab_result[0].result_value }}
-                                {% else %}
-                                    <span class="text-muted">Pending</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if lab_service.lab_result %}
-                                    {{ lab_service.lab_result[0].reference_range or '-' }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if lab_service.lab_result %}
-                                    {% if lab_service.lab_result[0].status == 'Completed' %}
-                                        <span class="custom-badge status-green">{{ lab_service.lab_result[0].status }}</span>
-                                    {% else %}
-                                        <span class="custom-badge status-orange">{{ lab_service.lab_result[0].status }}</span>
-                                    {% endif %}
-                                {% else %}
-                                    <span class="custom-badge status-red">Pending</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if lab_service.lab_result %}
-                                    {{ lab_service.lab_result[0].performed_by or '-' }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if lab_service.lab_result %}
-                                    {{ lab_service.lab_result[0].remarks or '-' }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                        </tr>
+                        {% set has_completed_results = false %}
+                        {% for bill_item in lab_results %}
+                            {% set lab_results_for_bill_item = bill_item.lab_result %}
+                            {% if lab_results_for_bill_item %}
+                                {% set has_completed_results = true %}
+                                {% for lab_result in lab_results_for_bill_item %}
+                                <tr>
+                                    <td>{{ bill_item.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ bill_item.description }}</td>
+                                    <td>{{ lab_result.result_value }}</td>
+                                    <td>{{ lab_result.reference_range or '-' }}</td>
+                                    <td>
+                                        <span class="custom-badge status-green">{{ lab_result.status }}</span>
+                                    </td>
+                                    <td>
+                                        {% if lab_result.technician %}
+                                            {{ lab_result.technician.first_name }} {{ lab_result.technician.last_name }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('view_lab_result', result_id=lab_result.id) }}" 
+                                           class="btn btn-primary btn-sm">
+                                            <i class="fa fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% endif %}
                         {% else %}
                         <tr>
-                            <td colspan="7" class="text-center">No lab results available</td>
+                            <td colspan="7" class="text-center">No completed lab results found</td>
                         </tr>
                         {% endfor %}
                     </tbody>

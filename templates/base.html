@@ -84,13 +84,21 @@
                             </li>
                             {% endif %}
                             
-                            {% if current_user.is_authenticated and current_user.role == 'lab_technician' %}
-                            <li class="menu-item">
-                                <a href="{{ url_for('lab_results') }}">
-                                    <i class="fa fa-file-text-o"></i>
-                                    <span>Lab Results</span>
+                            {% if current_user.is_authenticated %}
+                            {% if current_user.role == 'lab_technician' %}
+                            <li class="menu-title">Lab Management</li>
+                            <li class="submenu">
+                                <a href="#">
+                                    <i class="fa fa-flask"></i> 
+                                    <span>Lab Results</span> 
+                                    <span class="menu-arrow"></span>
                                 </a>
+                                <ul class="submenu_class" style="display: none;">
+                                    <li><a href="{{ url_for('lab_results') }}">View Lab Results</a></li>
+                                    <li><a href="{{ url_for('pending_lab_service_requests') }}">Add Lab Results</a></li>
+                                </ul>
                             </li>
+                            {% endif %}
                             {% endif %}
                             
                             {% if current_user.role == 'admin' %}
@@ -105,6 +113,30 @@
                             </li>
                             <li>
                                 <a href="{{ url_for('billing') }}"><i class="fa fa-money"></i> <span>Billing</span></a>
+                            </li>
+                            {% endif %}
+                            
+                            {% if current_user.is_authenticated and current_user.role == 'doctor' %}
+                            <li class="menu-item">
+                                <a href="{{ url_for('request_lab_service') }}">
+                                    <i class="fa fa-flask"></i>
+                                    <span>Request Lab Service</span>
+                                </a>
+                            </li>
+                            <li class="menu-item">
+                                <a href="{{ url_for('view_lab_service_requests') }}">
+                                    <i class="fa fa-list"></i>
+                                    <span>Lab Service Requests</span>
+                                </a>
+                            </li>
+                            {% endif %}
+
+                            {% if current_user.is_authenticated and current_user.role in ['lab_technician', 'admin'] %}
+                            <li class="menu-item">
+                                <a href="{{ url_for('view_lab_service_requests') }}">
+                                    <i class="fa fa-list"></i>
+                                    <span>Lab Service Requests</span>
+                                </a>
                             </li>
                             {% endif %}
                         {% endif %}

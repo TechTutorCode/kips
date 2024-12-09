@@ -4,75 +4,47 @@
     <div class="content">
         <div class="row">
             <div class="col-lg-8 offset-lg-2">
-                <h4 class="page-title">{{ 'Edit' if lab_result else 'Add' }} Lab Result</h4>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-lg-8 offset-lg-2">
+                <h4 class="page-title">Add Lab Result</h4>
                 <form method="POST">
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-sm-6">
                             <div class="form-group">
                                 <label>Patient Name</label>
-                                <input class="form-control" type="text" value="{{ bill_item.bill.patient.first_name }} {{ bill_item.bill.patient.last_name }}" readonly>
+                                <input type="text" class="form-control" 
+                                       value="{{ patient.first_name }} {{ patient.last_name }}" readonly>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-sm-6">
                             <div class="form-group">
                                 <label>Lab Service</label>
-                                <input class="form-control" type="text" value="{{ bill_item.description }}" readonly>
+                                <input type="text" class="form-control" 
+                                       value="{{ lab_service.name }}" readonly>
                             </div>
                         </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-12">
+                        <div class="col-sm-12">
                             <div class="form-group">
                                 <label>Result Value <span class="text-danger">*</span></label>
-                                <textarea class="form-control" name="result_value" required>{{ lab_result.result_value if lab_result else '' }}</textarea>
+                                <textarea class="form-control" name="result_value" required 
+                                          placeholder="Enter lab result value"></textarea>
                             </div>
                         </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-sm-6">
                             <div class="form-group">
                                 <label>Reference Range</label>
-                                <input class="form-control" type="text" name="reference_range" value="{{ lab_result.reference_range if lab_result else '' }}">
+                                <input type="text" class="form-control" name="reference_range" 
+                                       placeholder="Enter reference range">
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label>Status</label>
-                                <select class="form-control" name="status">
-                                    <option value="Pending" {% if lab_result and lab_result.status == 'Pending' %}selected{% endif %}>Pending</option>
-                                    <option value="Completed" {% if lab_result and lab_result.status == 'Completed' %}selected{% endif %}>Completed</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label>Performed By</label>
-                                <input class="form-control" type="text" name="performed_by" value="{{ lab_result.performed_by if lab_result else '' }}">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label>Performed At</label>
-                                <input class="form-control" type="datetime-local" name="performed_at" value="{{ lab_result.performed_at.strftime('%Y-%m-%dT%H:%M') if lab_result and lab_result.performed_at else '' }}">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-12">
+                        <div class="col-sm-6">
                             <div class="form-group">
                                 <label>Remarks</label>
-                                <textarea class="form-control" name="remarks">{{ lab_result.remarks if lab_result else '' }}</textarea>
+                                <textarea class="form-control" name="remarks" 
+                                          placeholder="Additional remarks"></textarea>
                             </div>
                         </div>
                     </div>
                     <div class="m-t-20 text-center">
-                        <button class="btn btn-primary submit-btn">Save Result</button>
+                        <button type="submit" class="btn btn-primary submit-btn">Add Lab Result</button>
                     </div>
                 </form>
             </div>
