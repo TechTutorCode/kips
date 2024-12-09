@@ -1,3 +1,31 @@
 env
 /env
 ./env
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+env/
+venv/
+.env
+
+# Database files
+*.db
+*.sqlite3
+
+# Instance folder (contains local configuration and database)
+instance/
+
+# Logs
+*.log
+
+# IDE-specific files
+.vscode/
+.idea/
+
+# Miscellaneous
+.DS_Store
+*.swp
+*.swo

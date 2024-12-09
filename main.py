@@ -101,32 +101,16 @@ def index():
 @app.route('/doctors')
 @login_required
 @role_required(['admin', 'doctor'])
-def add_doctor():
-    if request.method=="GET":
-        doctors=Doctor.query.all()
-        print(doctors)
-        return render_template("doctors.html", doctors=doctors)
+def doctors():
+    doctors = Doctor.query.all()
+    print(doctors)
+    return render_template('doctors.html', doctors=doctors)
 
-@app.route('/department')
-@login_required
-def department():
-     return render_template('departments.html')
-
-@app.route('/patients')
-@login_required
-@role_required(['admin', 'doctor'])
-def patient():
-     patients = Patient.query.all()
-     return render_template('patients.html', patients=patients)
-
-@app.route('/add-doctor',  methods=['POST','GET'])
+@app.route('/add-doctor', methods=['GET', 'POST'])
 @login_required
 @role_required(['admin'])
-def add_d():
-    if request.method=="GET":
-        return render_template("add_doctor.html")
-    
-    if request.method=="POST":
+def add_doctor():
+    if request.method == 'POST':
         try:
             first_name = request.form.get('first_name')
             last_name = request.form.get('last_name')
@@ -139,7 +123,7 @@ def add_d():
             existing_doctor = Doctor.query.filter_by(email=email).first()
             if existing_doctor:
                 flash('A doctor with this email already exists.', 'error')
-                return redirect(url_for('add_d'))
+                return redirect(url_for('add_doctor'))
             
             # Hash the password
             hashed_password = generate_password_hash(password)
@@ -170,88 +154,68 @@ def add_d():
             db.session.commit()
             
             flash('Doctor added successfully!', 'success')
-            return redirect(url_for('add_d'))
+            return redirect(url_for('add_doctor'))
         
         except Exception as e:
             db.session.rollback()
             flash(f'Error adding doctor: {str(e)}', 'error')
-            return redirect(url_for('add_d'))
+            return redirect(url_for('add_doctor'))
+    
+    departments = Department.query.all()
+    return render_template('add_doctor.html', departments=departments)
 
-@app.route('/profile/<int:id>')
+@app.route('/department')
 @login_required
-def profile(id):
-     doctor = Doctor.query.filter_by(id=id).first()
-     return render_template("profile.html", doctor=doctor)      
+def department():
+     return render_template('departments.html')
+
+@app.route('/patients')
+@login_required
+@role_required(['admin', 'doctor'])
+def patient():
+     patients = Patient.query.all()
+     return render_template('patients.html', patients=patients)
 
 @app.route('/add-patient',  methods=['POST','GET'])
 @login_required
 @role_required(['admin', 'doctor'])
 def add_p():
-    if request.method=="GET":
-        return render_template("add_patient.html")
-    elif request.method == "POST":
-        first_name = request.form.get('first_name')
-        last_name = request.form.get('last_name')
-        email = request.form.get('email')
-        address = request.form.get('address')
-        gender = request.form.get('gender')
-        phone = request.form.get('phone')
-        dob = request.form.get('dob')
-        
-        # Create new patient
-        patient = Patient(
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            address=address,
-            gender=gender,
-            phone=phone,
-            dob=datetime.strptime(dob, '%Y-%m-%d') if dob else None
-        )
-        
-        db.session.add(patient)
-        db.session.commit()
-        
-        flash('Patient added successfully!')
-        return redirect(url_for('patient'))
-
-@app.route('/delete-patient', methods=['POST'])
-@login_required
-@role_required(['admin', 'doctor'])
-def delete_patient():
-    patient_id = request.form.get('patient_id')
-    if patient_id:
-        patient = Patient.query.get(patient_id)
-        if patient:
-            db.session.delete(patient)
-            db.session.commit()
-            flash('Patient deleted successfully!')
-    return redirect(url_for('patient'))
-
-@app.route('/edit-doctor/<int:doctor_id>', methods=['GET', 'POST'])
-@login_required
-@role_required(['admin'])
-def edit_doctor(doctor_id):
-    doctor = Doctor.query.get_or_404(doctor_id)
-    
     if request.method == 'POST':
-        doctor.first_name = request.form['first_name']
-        doctor.last_name = request.form['last_name']
-        doctor.email = request.form['email']
-        doctor.gender = request.form['gender']
-        doctor.phone = request.form['phone']
-        doctor.status = request.form['status'] == 'true'
-        
-        # Only update password if a new one is provided
-        new_password = request.form.get('password')
-        if new_password:
-            doctor.password = generate_password_hash(new_password)
+        try:
+            first_name = request.form.get('first_name')
+            last_name = request.form.get('last_name')
+            email = request.form.get('email')
+            phone = request.form.get('phone')
+            gender = request.form.get('gender')
+            dob = request.form.get('dob')
+            address = request.form.get('address')
             
-        db.session.commit()
-        flash('Doctor updated successfully!')
-        return redirect(url_for('add_doctor'))
+            # Convert dob to datetime
+            dob = datetime.strptime(dob, '%Y-%m-%d') if dob else None
+            
+            # Create new patient
+            new_patient = Patient(
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                phone=phone,
+                gender=gender,
+                dob=dob,
+                address=address
+            )
+            
+            db.session.add(new_patient)
+            db.session.commit()
+            
+            flash('Patient added successfully!', 'success')
+            return redirect(url_for('add_p'))
         
-    return render_template('edit_doctor.html', doctor=doctor)
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding patient: {str(e)}', 'danger')
+            return redirect(url_for('add_p'))
+    
+    return render_template('add_patient.html')
 
 @app.route('/edit-patient/<int:patient_id>', methods=['GET', 'POST'])
 @login_required
@@ -260,25 +224,45 @@ def edit_patient(patient_id):
     patient = Patient.query.get_or_404(patient_id)
     
     if request.method == 'POST':
-        patient.first_name = request.form['first_name']
-        patient.last_name = request.form['last_name']
-        patient.email = request.form.get('email')
-        patient.gender = request.form['gender']
-        patient.phone = request.form['phone']
-        patient.address = request.form.get('address')
-        
-        # Handle date of birth
-        dob = request.form.get('dob')
-        if dob:
-            patient.dob = datetime.strptime(dob, '%Y-%m-%d')
-        else:
-            patient.dob = None
+        try:
+            patient.first_name = request.form.get('first_name')
+            patient.last_name = request.form.get('last_name')
+            patient.email = request.form.get('email')
+            patient.phone = request.form.get('phone')
+            patient.gender = request.form.get('gender')
+            patient.address = request.form.get('address')
             
-        db.session.commit()
-        flash('Patient updated successfully!')
-        return redirect(url_for('patient'))
+            # Convert dob to datetime
+            dob_str = request.form.get('dob')
+            patient.dob = datetime.strptime(dob_str, '%Y-%m-%d') if dob_str else None
+            
+            db.session.commit()
+            flash('Patient updated successfully!', 'success')
+            return redirect(url_for('patient'))
         
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating patient: {str(e)}', 'danger')
+            return redirect(url_for('edit_patient', patient_id=patient_id))
+    
     return render_template('edit_patient.html', patient=patient)
+
+@app.route('/delete-patient', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_patient():
+    patient_id = request.form.get('patient_id')
+    patient = Patient.query.get_or_404(patient_id)
+    
+    try:
+        db.session.delete(patient)
+        db.session.commit()
+        flash('Patient deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting patient: {str(e)}', 'danger')
+    
+    return redirect(url_for('patient'))
 
 @app.route('/patient-records/<int:patient_id>')
 @login_required
@@ -354,7 +338,7 @@ def add_record(patient_id):
             
         db.session.add(record)
         db.session.commit()
-        flash('Patient record added successfully!')
+        flash('Patient record added successfully!', 'success')
         return redirect(url_for('patient_records', patient_id=patient_id))
         
     return render_template('add_record.html', patient=patient, doctors=doctors)
@@ -379,7 +363,7 @@ def edit_record(record_id):
             record.next_visit = None
             
         db.session.commit()
-        flash('Patient record updated successfully!')
+        flash('Patient record updated successfully!', 'success')
         return redirect(url_for('patient_records', patient_id=record.patient_id))
         
     return render_template('edit_record.html', record=record, doctors=doctors)
@@ -392,6 +376,11 @@ def appointments():
     appointments = PatientRecord.query.filter(
         PatientRecord.next_visit != None
     ).order_by(PatientRecord.next_visit).all()
+    
+    # Ensure diagnosis is a string or empty string
+    for record in appointments:
+        if record.diagnosis is None:
+            record.diagnosis = ''
     
     return render_template('appointments.html', appointments=appointments, today=today)
 
@@ -492,29 +481,35 @@ def pharmacy():
 @role_required(['admin'])
 def add_pharmacy_item():
     if request.method == 'POST':
-        name = request.form.get('name')
-        category = request.form.get('category')
-        description = request.form.get('description')
-        unit = request.form.get('unit')
-        quantity = int(request.form.get('quantity'))
-        cost_per_unit = float(request.form.get('cost_per_unit'))
-        reorder_level = int(request.form.get('reorder_level'))
+        try:
+            name = request.form.get('name')
+            category = request.form.get('category')
+            description = request.form.get('description')
+            unit = request.form.get('unit')
+            quantity = int(request.form.get('quantity'))
+            cost_per_unit = float(request.form.get('cost_per_unit'))
+            reorder_level = int(request.form.get('reorder_level'))
 
-        item = PharmacyItem(
-            name=name,
-            category=category,
-            description=description,
-            unit=unit,
-            quantity=quantity,
-            cost_per_unit=cost_per_unit,
-            reorder_level=reorder_level
-        )
+            item = PharmacyItem(
+                name=name,
+                category=category,
+                description=description,
+                unit=unit,
+                quantity=quantity,
+                cost_per_unit=cost_per_unit,
+                reorder_level=reorder_level
+            )
+            
+            db.session.add(item)
+            db.session.commit()
+            
+            flash('Pharmacy item added successfully!', 'success')
+            return redirect(url_for('pharmacy'))
         
-        db.session.add(item)
-        db.session.commit()
-        
-        flash('Pharmacy item added successfully!', 'success')
-        return redirect(url_for('pharmacy'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding pharmacy item: {str(e)}', 'error')
+            return redirect(url_for('add_pharmacy_item'))
     
     return render_template('add_pharmacy_item.html')
 
@@ -525,17 +520,23 @@ def edit_pharmacy_item(item_id):
     item = PharmacyItem.query.get_or_404(item_id)
     
     if request.method == 'POST':
-        item.name = request.form.get('name')
-        item.category = request.form.get('category')
-        item.description = request.form.get('description')
-        item.unit = request.form.get('unit')
-        item.quantity = int(request.form.get('quantity'))
-        item.cost_per_unit = float(request.form.get('cost_per_unit'))
-        item.reorder_level = int(request.form.get('reorder_level'))
+        try:
+            item.name = request.form.get('name')
+            item.category = request.form.get('category')
+            item.description = request.form.get('description')
+            item.unit = request.form.get('unit')
+            item.quantity = int(request.form.get('quantity'))
+            item.cost_per_unit = float(request.form.get('cost_per_unit'))
+            item.reorder_level = int(request.form.get('reorder_level'))
+            
+            db.session.commit()
+            flash('Pharmacy item updated successfully!', 'success')
+            return redirect(url_for('pharmacy'))
         
-        db.session.commit()
-        flash('Pharmacy item updated successfully!', 'success')
-        return redirect(url_for('pharmacy'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating pharmacy item: {str(e)}', 'error')
+            return redirect(url_for('edit_pharmacy_item', item_id=item_id))
     
     return render_template('edit_pharmacy_item.html', item=item)
 
@@ -573,7 +574,7 @@ def create_bill():
         try:
             patient_id = request.form.get('patient_id')
             bill_date = datetime.strptime(request.form.get('bill_date'), '%Y-%m-%d')
-            total_amount = float(request.form.get('total_amount'))
+            total_amount = float(request.form.get('total_amount', 0))
 
             # Validate patient exists
             patient = Patient.query.get(patient_id)
@@ -592,61 +593,116 @@ def create_bill():
             db.session.add(bill)
             db.session.flush()  # Get bill ID before committing
 
-            # Create bill items
+            # Collect form data with more robust method
             item_types = request.form.getlist('item_type[]')
             item_ids = request.form.getlist('item_id[]')
             descriptions = request.form.getlist('description[]')
             quantities = request.form.getlist('quantity[]')
             unit_prices = request.form.getlist('unit_price[]')
             total_prices = request.form.getlist('total_price[]')
-            bill_item_ids = request.form.getlist('bill_item_id[]')
-            
-            for i in range(len(item_types)):
-                if bill_item_ids[i]:  # Update existing item
+            bill_item_ids = request.form.getlist('bill_item_id[]') if 'bill_item_id[]' in request.form else []
+
+            # Ensure consistent list lengths by padding shorter lists
+            max_length = max(
+                len(item_types), len(item_ids), len(descriptions), 
+                len(quantities), len(unit_prices), len(total_prices), 
+                len(bill_item_ids or [])
+            )
+
+            # Pad lists to ensure consistent length
+            item_types += [''] * (max_length - len(item_types))
+            item_ids += [''] * (max_length - len(item_ids))
+            descriptions += [''] * (max_length - len(descriptions))
+            quantities += ['1'] * (max_length - len(quantities))
+            unit_prices += ['0'] * (max_length - len(unit_prices))
+            total_prices += ['0'] * (max_length - len(total_prices))
+            bill_item_ids += [''] * (max_length - len(bill_item_ids))
+
+            # Create bill items
+            bill_total = 0.0
+            for i in range(max_length):
+                # Skip completely empty rows
+                if not item_types[i] or not item_ids[i]:
+                    continue
+
+                # Convert to appropriate types with error handling
+                try:
+                    quantity = float(quantities[i] or 1)
+                    unit_price = float(unit_prices[i] or 0)
+                    total_price = float(total_prices[i] or 0)
+                except ValueError:
+                    print(f"Skipping invalid row {i}: Invalid numeric values")
+                    continue
+
+                # Determine if updating existing or creating new bill item
+                if bill_item_ids[i] and bill_item_ids[i].strip():
+                    # Update existing bill item
                     bill_item = BillItem.query.get(int(bill_item_ids[i]))
-                    bill_item.item_type = item_types[i]
-                    bill_item.item_id = item_ids[i]
-                    bill_item.quantity = quantities[i]
-                    bill_item.description = descriptions[i]
-                    bill_item.unit_price = unit_prices[i]
-                    bill_item.total_price = total_prices[i]
-                else:  # Add new item
+                    if bill_item:
+                        bill_item.item_type = item_types[i]
+                        bill_item.item_id = item_ids[i]
+                        bill_item.quantity = quantity
+                        bill_item.description = descriptions[i]
+                        bill_item.unit_price = unit_price
+                        bill_item.total_price = total_price
+                else:
+                    # Create new bill item
                     bill_item = BillItem(
                         bill_id=bill.id,
                         item_type=item_types[i],
                         item_id=item_ids[i],
-                        quantity=quantities[i],
+                        quantity=quantity,
                         description=descriptions[i],
-                        unit_price=unit_prices[i],
-                        total_price=total_prices[i]
+                        unit_price=unit_price,
+                        total_price=total_price
                     )
                     db.session.add(bill_item)
+                
+                # Reduce pharmacy item quantity if it's a pharmacy item
+                if item_types[i] == 'Pharmacy':
+                    pharmacy_item = PharmacyItem.query.get(item_ids[i])
+                    if pharmacy_item:
+                        # Check if there's enough stock
+                        if pharmacy_item.quantity < quantity:
+                            flash(f'Insufficient stock for {pharmacy_item.name}. Available: {pharmacy_item.quantity}', 'error')
+                            db.session.rollback()
+                            return redirect(url_for('create_bill'))
+                        
+                        # Reduce pharmacy item quantity
+                        pharmacy_item.quantity -= quantity
+                        print(f"Reduced {pharmacy_item.name} stock by {quantity}. Remaining: {pharmacy_item.quantity}")
+                
+                # Accumulate bill total
+                bill_total += total_price
         
             # Update bill total
-            bill.total_amount = sum(float(price) for price in total_prices)
+            bill.total_amount = bill_total
         
             try:
                 db.session.commit()
-                flash('Bill updated successfully', 'success')
+                flash('Bill created successfully', 'success')
                 return redirect(url_for('billing'))
             except Exception as e:
                 db.session.rollback()
-                flash('Error updating bill: ' + str(e), 'error')
+                print(f"Commit Error: {str(e)}")
+                flash(f'Error creating bill: {str(e)}', 'error')
+                return redirect(url_for('create_bill'))
         except Exception as e:
-                db.session.rollback()
-                flash('Error updating bill: ' + str(e), 'error')
-    # GET request - show edit form
+            db.session.rollback()
+            print(f"Processing Error: {str(e)}")
+            flash(f'Error creating bill: {str(e)}', 'error')
+            return redirect(url_for('create_bill'))
+    
+    # GET request - show create bill form
     patients = Patient.query.all()
     lab_services = LabService.query.all()
     pharmacy_items = PharmacyItem.query.all()
-    bill_items = BillItem.query.filter_by(bill_id=bill_id).all()
     
-    return render_template('edit_bill.html', 
+    return render_template('create_bill.html', 
                          patients=patients,
                          lab_services=lab_services,
                          pharmacy_items=pharmacy_items,
-                         bill=bill,
-                         bill_items=bill_items)
+                         bill_items=[])
 
 @app.route('/view-bill/<int:bill_id>')
 @login_required
@@ -1221,6 +1277,31 @@ def pending_lab_service_requests():
                 filtered_requests.append(request)
     
     return render_template('pending_lab_service_requests.html', requests=filtered_requests)
+
+@app.route('/edit-doctor/<int:doctor_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['admin'])
+def edit_doctor(doctor_id):
+    doctor = Doctor.query.get_or_404(doctor_id)
+    
+    if request.method == 'POST':
+        doctor.first_name = request.form['first_name']
+        doctor.last_name = request.form['last_name']
+        doctor.email = request.form['email']
+        doctor.gender = request.form['gender']
+        doctor.phone = request.form['phone']
+        doctor.status = request.form['status'] == 'true'
+        
+        # Only update password if a new one is provided
+        new_password = request.form.get('password')
+        if new_password:
+            doctor.password = generate_password_hash(new_password)
+            
+        db.session.commit()
+        flash('Doctor updated successfully!')
+        return redirect(url_for('doctors'))
+        
+    return render_template('edit_doctor.html', doctor=doctor)
 
 if __name__ == '__main__':
     app.run(debug=True)

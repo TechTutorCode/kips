@@ -33,7 +33,13 @@
                                 </td>
                                 <td>Dr. {{ record.doctor.first_name }} {{ record.doctor.last_name }}</td>
                                 <td>{{ record.next_visit.strftime('%d %b %Y') if record.next_visit else '' }}</td>
-                                <td>{{ record.diagnosis[:50] + '...' if record.diagnosis|length > 50 else record.diagnosis }}</td>
+                                <td>
+                                    {% if record.diagnosis %}
+                                        {{ record.diagnosis[:50] + '...' if record.diagnosis|length > 50 else record.diagnosis }}
+                                    {% else %}
+                                        No diagnosis
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if record.next_visit and record.next_visit < today %}
                                         <span class="custom-badge status-red">Past</span>
