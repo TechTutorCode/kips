@@ -17,7 +17,9 @@ venv/
 
 # Instance folder (contains local configuration and database)
 instance/
-
+./instance
+instance/*
+./instance/*
 # Logs
 *.log
 
