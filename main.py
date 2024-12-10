@@ -55,12 +55,54 @@ def role_required(roles):
 
 with app.app_context():
     db.create_all()  # Ensures all tables are created before handling requests
+    
+    # Check and create default users if they don't exist
+    def create_default_users():
+        # Define default users
+        default_users = [
+            {
+                'email': 'admin@kips.com',
+                'password': 'admin123',
+                'role': 'admin'
+            },
+            {
+                'email': 'doctor@kips.com',
+                'password': 'doctor123',
+                'role': 'doctor'
+            },
+            {
+                'email': 'billing@kips.com',
+                'password': 'billing123',
+                'role': 'billing'
+            }
+        ]
+        
+        # Check and create users
+        for user_data in default_users:
+            existing_user = User.query.filter_by(email=user_data['email']).first()
+            if not existing_user:
+                # Create new user
+                new_user = User(
+                    email=user_data['email'],
+                    role=user_data['role'],
+                    password=user_data['password']
+                )
+                
+                # Add and commit
+                db.session.add(new_user)
+                print(f"Created default user: {user_data['email']}")
+        
+        # Commit all changes
+        db.session.commit()
+    
+    # Run user creation
+    create_default_users()
 
 @app.route("/")
 @login_required
 def index():
     # Get today's date range
-    today = datetime(2024, 12, 9).date()  # Using provided timestamp
+    today = datetime.utcnow().date()  # Use current date
     today_start = datetime.combine(today, datetime.min.time())
     today_end = datetime.combine(today, datetime.max.time())
     
@@ -69,22 +111,73 @@ def index():
         PatientRecord.next_visit.between(today_start, today_end)
     ).order_by(PatientRecord.next_visit).all()
     appointment_count = len(todays_appointments)
+    print(f"Today's Appointments: {appointment_count}")
     
     # Get pending payments (total balance from unpaid bills)
-    pending_bills = Bill.query.filter(Bill.status.in_(['Unpaid', 'Partially Paid'])).all()
-    pending_payments = sum(bill.total_amount - bill.paid_amount for bill in pending_bills)
+    from sqlalchemy import func
+
+    # Detailed query with logging
+    print("Pending Bills Query Debug:")
+    
+    # Count of bills with different statuses
+    status_counts = db.session.query(
+        Bill.status, 
+        func.count(Bill.id).label('count'), 
+        func.sum(Bill.total_amount).label('total_amount'),
+        func.sum(Bill.paid_amount).label('paid_amount')
+    ).group_by(Bill.status).all()
+    
+    print("Bill Status Breakdown:")
+    for status, count, total_amount, paid_amount in status_counts:
+        print(f"Status: {status}")
+        print(f"  Count: {count}")
+        print(f"  Total Amount: {total_amount}")
+        print(f"  Paid Amount: {paid_amount}")
+        print("---")
+    
+    # Explicitly calculate pending payments
+    pending_bills = Bill.query.filter(Bill.status.in_(['Unpaid', 'Partial'])).all()
+  
+    print("\nDetailed Pending Bills:")
+    pending_payments = 0.0
+    for bill in pending_bills:
+        print("hello")
+        balance = bill.total_amount - bill.paid_amount
+        pending_payments += balance
+        
+        print(f"Bill ID: {bill.id}")
+        print(f"  Patient: {bill.patient.first_name} {bill.patient.last_name}")
+        print(f"  Total Amount: {bill.total_amount}")
+        print(f"  Paid Amount: {bill.paid_amount}")
+        print(f"  Status: {bill.status}")
+        print(f"  Balance: {balance}")
+    
+    print(f"\nPending Payments Total: {pending_payments}")
     
     # Get low stock items
     low_stock_items = PharmacyItem.query.filter(
         PharmacyItem.quantity <= PharmacyItem.reorder_level
     ).all()
     low_stock_count = len(low_stock_items)
+    print(f"Low Stock Items: {low_stock_count}")
     
-    # Calculate today's revenue from payments
-    today_payments = Payment.query.filter(
-        Payment.payment_date.between(today_start, today_end)
-    ).all()
-    today_revenue = sum(payment.amount for payment in today_payments)
+    # Calculate today's revenue from payments and bills
+    today_revenue_query = db.session.query(
+        func.coalesce(func.sum(Bill.total_amount), 0.0).label('bill_total'),
+        func.coalesce(func.sum(Payment.amount), 0.0).label('payment_total')
+    ).outerjoin(Payment, Bill.id == Payment.bill_id).filter(
+        Bill.bill_date.between(today_start, today_end)
+    ).first()
+
+    today_revenue = today_revenue_query.bill_total + today_revenue_query.payment_total
+    print(f"Today's Revenue Breakdown:")
+    print(f"  Bills Total: {today_revenue_query.bill_total}")
+    print(f"  Payments Total: {today_revenue_query.payment_total}")
+    print(f"  Total Revenue: {today_revenue}")
+    
+    # Optional: Separate revenue sources for more detailed tracking
+    bill_revenue = today_revenue_query.bill_total
+    payment_revenue = today_revenue_query.payment_total
     
     # Get recent bills
     recent_bills = Bill.query.order_by(Bill.created_at.desc()).limit(5).all()
@@ -98,7 +191,7 @@ def index():
                          low_stock_items=low_stock_items,
                          recent_bills=recent_bills)
 
-@app.route('/doctors')
+@app.route("/doctors")
 @login_required
 @role_required(['admin', 'doctor'])
 def doctors():
@@ -154,20 +247,14 @@ def add_doctor():
             db.session.commit()
             
             flash('Doctor added successfully!', 'success')
-            return redirect(url_for('add_doctor'))
+            return redirect(url_for('doctors'))
         
         except Exception as e:
             db.session.rollback()
             flash(f'Error adding doctor: {str(e)}', 'error')
             return redirect(url_for('add_doctor'))
     
-    departments = Department.query.all()
-    return render_template('add_doctor.html', departments=departments)
-
-@app.route('/department')
-@login_required
-def department():
-     return render_template('departments.html')
+    return render_template('add_doctor.html')
 
 @app.route('/patients')
 @login_required
@@ -208,7 +295,7 @@ def add_p():
             db.session.commit()
             
             flash('Patient added successfully!', 'success')
-            return redirect(url_for('add_p'))
+            return redirect(url_for('patient'))
         
         except Exception as e:
             db.session.rollback()
@@ -271,50 +358,24 @@ def patient_records(patient_id):
     patient = Patient.query.get_or_404(patient_id)
     records = PatientRecord.query.filter_by(patient_id=patient_id).order_by(PatientRecord.created_at.desc()).all()
     
-    # Get lab results for this patient with 'Completed' status
-    # First, find all bills for this patient
-    bills = Bill.query.filter(
-        Bill.patient_id == patient_id,
-        Bill.status.in_(['Paid', 'Partial'])
-    ).all()
-    
-    # Collect bill item IDs
-    bill_item_ids = []
-    for bill in bills:
-        bill_item_ids.extend([item.id for item in bill.items if item.item_type == 'Lab Service'])
-    
-    # Find completed lab results for these bill items
+    # Fetch lab results directly for the patient
     completed_lab_results = LabResult.query.filter(
-        LabResult.bill_item_id.in_(bill_item_ids),
+        LabResult.patient_id == patient_id,
         LabResult.status == 'Completed'
     ).all()
     
-    # Organize lab results by bill item
-    lab_results_by_bill_item = {}
+    # Debugging and logging
+    print(f"Total Completed Lab Results for Patient {patient_id}: {len(completed_lab_results)}")
     for lab_result in completed_lab_results:
-        bill_item = BillItem.query.get(lab_result.bill_item_id)
-        if bill_item:
-            if bill_item not in lab_results_by_bill_item:
-                lab_results_by_bill_item[bill_item] = []
-            lab_results_by_bill_item[bill_item].append(lab_result)
-    
-    # Convert to list for template
-    completed_lab_results_list = [
-        bill_item for bill_item, results in lab_results_by_bill_item.items()
-    ]
-    
-    # Debug print
-    print(f"Patient ID: {patient_id}")
-    print(f"Total Bills: {len(bills)}")
-    print(f"Bill Item IDs: {bill_item_ids}")
-    print(f"Completed Lab Results: {len(completed_lab_results)}")
-    for bill_item, results in lab_results_by_bill_item.items():
-        print(f"Bill Item ID: {bill_item.id}, Lab Results: {results}")
+        print(f"Lab Result ID: {lab_result.id}")
+        print(f"Result Value: {lab_result.result_value}")
+        print(f"Reference Range: {lab_result.reference_range}")
+        print("---")
     
     return render_template('patient_records.html', 
                          patient=patient, 
                          records=records,
-                         lab_results=completed_lab_results_list)
+                         lab_results=completed_lab_results)
 
 @app.route('/add-record/<int:patient_id>', methods=['GET', 'POST'])
 @login_required
@@ -564,7 +625,12 @@ def billing():
         else:
             bill.status = 'Pending'
     db.session.commit()
-    return render_template('billing.html', bills=bills)
+    
+    # Separate bills into completed and pending
+    completed_bills = [bill for bill in bills if bill.status == 'Paid']
+    pending_bills = [bill for bill in bills if bill.status in ['Pending', 'Partial']]
+    
+    return render_template('billing.html', completed_bills=completed_bills, pending_bills=pending_bills)
 
 @app.route('/create-bill', methods=['GET', 'POST'])
 @login_required
@@ -572,125 +638,115 @@ def billing():
 def create_bill():
     if request.method == 'POST':
         try:
+            # Validate patient_id
             patient_id = request.form.get('patient_id')
-            bill_date = datetime.strptime(request.form.get('bill_date'), '%Y-%m-%d')
-            total_amount = float(request.form.get('total_amount', 0))
-
-            # Validate patient exists
+            if not patient_id:
+                raise ValueError("Patient ID is required")
+            
             patient = Patient.query.get(patient_id)
             if not patient:
-                flash('Invalid patient selected', 'error')
-                return redirect(url_for('create_bill'))
-
-            # Create bill
-            bill = Bill(
-                patient_id=patient_id,
-                bill_date=bill_date,
-                total_amount=total_amount,
-                status='Pending',
-                paid_amount=0.0
-            )
-            db.session.add(bill)
-            db.session.flush()  # Get bill ID before committing
-
-            # Collect form data with more robust method
+                raise ValueError("Invalid patient selected")
+            
+            # Validate bill date
+            bill_date = request.form.get('bill_date')
+            if not bill_date:
+                raise ValueError("Bill date is required")
+            
+            try:
+                bill_date = datetime.strptime(bill_date, '%Y-%m-%d')
+            except ValueError:
+                raise ValueError("Invalid date format. Use YYYY-MM-DD")
+            
+            # Process bill items
             item_types = request.form.getlist('item_type[]')
             item_ids = request.form.getlist('item_id[]')
             descriptions = request.form.getlist('description[]')
             quantities = request.form.getlist('quantity[]')
             unit_prices = request.form.getlist('unit_price[]')
             total_prices = request.form.getlist('total_price[]')
-            bill_item_ids = request.form.getlist('bill_item_id[]') if 'bill_item_id[]' in request.form else []
-
-            # Ensure consistent list lengths by padding shorter lists
-            max_length = max(
-                len(item_types), len(item_ids), len(descriptions), 
-                len(quantities), len(unit_prices), len(total_prices), 
-                len(bill_item_ids or [])
+            
+            # Debug print to see exact form data
+            print("Form Data Debug:")
+            print(f"Item Types: {item_types}")
+            print(f"Item IDs: {item_ids}")
+            print(f"Descriptions: {descriptions}")
+            print(f"Quantities: {quantities}")
+            print(f"Unit Prices: {unit_prices}")
+            print(f"Total Prices: {total_prices}")
+            
+            # Validate bill items
+            if not item_types or len(item_types) == 0:
+                raise ValueError("At least one bill item is required")
+            
+            # Create new bill
+            bill = Bill(
+                patient_id=patient_id,
+                bill_date=bill_date,
+                status='Unpaid',
+                total_amount=0.0,
+                paid_amount=0.0
             )
-
-            # Pad lists to ensure consistent length
-            item_types += [''] * (max_length - len(item_types))
-            item_ids += [''] * (max_length - len(item_ids))
-            descriptions += [''] * (max_length - len(descriptions))
-            quantities += ['1'] * (max_length - len(quantities))
-            unit_prices += ['0'] * (max_length - len(unit_prices))
-            total_prices += ['0'] * (max_length - len(total_prices))
-            bill_item_ids += [''] * (max_length - len(bill_item_ids))
-
-            # Create bill items
-            bill_total = 0.0
-            for i in range(max_length):
-                # Skip completely empty rows
-                if not item_types[i] or not item_ids[i]:
-                    continue
-
-                # Convert to appropriate types with error handling
+            db.session.add(bill)
+            db.session.flush()  # Get bill ID before adding bill items
+            
+            # Add new bill items with type conversion and validation
+            total_bill_amount = 0.0
+            for i in range(len(item_types)):
                 try:
-                    quantity = float(quantities[i] or 1)
-                    unit_price = float(unit_prices[i] or 0)
-                    total_price = float(total_prices[i] or 0)
+                    quantity = float(quantities[i])
+                    unit_price = float(unit_prices[i])
+                    total_price = float(total_prices[i])
                 except ValueError:
-                    print(f"Skipping invalid row {i}: Invalid numeric values")
-                    continue
-
-                # Determine if updating existing or creating new bill item
-                if bill_item_ids[i] and bill_item_ids[i].strip():
-                    # Update existing bill item
-                    bill_item = BillItem.query.get(int(bill_item_ids[i]))
-                    if bill_item:
-                        bill_item.item_type = item_types[i]
-                        bill_item.item_id = item_ids[i]
-                        bill_item.quantity = quantity
-                        bill_item.description = descriptions[i]
-                        bill_item.unit_price = unit_price
-                        bill_item.total_price = total_price
-                else:
-                    # Create new bill item
-                    bill_item = BillItem(
-                        bill_id=bill.id,
-                        item_type=item_types[i],
-                        item_id=item_ids[i],
-                        quantity=quantity,
-                        description=descriptions[i],
-                        unit_price=unit_price,
-                        total_price=total_price
-                    )
-                    db.session.add(bill_item)
+                    raise ValueError(f"Invalid numeric value in bill item {i+1}")
                 
-                # Reduce pharmacy item quantity if it's a pharmacy item
-                if item_types[i] == 'Pharmacy':
-                    pharmacy_item = PharmacyItem.query.get(item_ids[i])
-                    if pharmacy_item:
-                        # Check if there's enough stock
-                        if pharmacy_item.quantity < quantity:
-                            flash(f'Insufficient stock for {pharmacy_item.name}. Available: {pharmacy_item.quantity}', 'error')
-                            db.session.rollback()
-                            return redirect(url_for('create_bill'))
+                if quantity <= 0 or unit_price < 0:
+                    raise ValueError(f"Invalid quantity or price in bill item {i+1}")
+                
+                # Validate item type and item_id
+                if item_types[i] not in ['Lab Service', 'Pharmacy', 'Consultation']:
+                    raise ValueError(f"Invalid item type in bill item {i+1}")
+                
+                if item_types[i] == 'Lab Service':
+                    item = LabService.query.get(item_ids[i])
+                elif item_types[i] == 'Pharmacy':
+                    item = PharmacyItem.query.get(item_ids[i])
+                    
+                    # Check and reduce pharmacy item quantity
+                    if item:
+                        if item.quantity < quantity:
+                            raise ValueError(f"Insufficient stock for {item.name}. Available: {item.quantity}")
                         
                         # Reduce pharmacy item quantity
-                        pharmacy_item.quantity -= quantity
-                        print(f"Reduced {pharmacy_item.name} stock by {quantity}. Remaining: {pharmacy_item.quantity}")
+                        item.quantity -= quantity
+                        print(f"Reduced {item.name} stock by {quantity}. Remaining: {item.quantity}")
+                    else:
+                        raise ValueError(f"Invalid pharmacy item in bill item {i+1}")
+                else:  # Consultation
+                    item = True  # Consultation is a special case
                 
-                # Accumulate bill total
-                bill_total += total_price
-        
+                bill_item = BillItem(
+                    bill_id=bill.id,
+                    item_type=item_types[i],
+                    item_id=item_ids[i] if item_types[i] != 'Consultation' else None,
+                    quantity=quantity,
+                    description=descriptions[i],
+                    unit_price=unit_price,
+                    total_price=total_price
+                )
+                db.session.add(bill_item)
+                total_bill_amount += total_price
+            
             # Update bill total
-            bill.total_amount = bill_total
+            bill.total_amount = total_bill_amount
+            
+            db.session.commit()
+            flash('Bill created successfully', 'success')
+            return redirect(url_for('billing'))
         
-            try:
-                db.session.commit()
-                flash('Bill created successfully', 'success')
-                return redirect(url_for('billing'))
-            except Exception as e:
-                db.session.rollback()
-                print(f"Commit Error: {str(e)}")
-                flash(f'Error creating bill: {str(e)}', 'error')
-                return redirect(url_for('create_bill'))
         except Exception as e:
             db.session.rollback()
-            print(f"Processing Error: {str(e)}")
-            flash(f'Error creating bill: {str(e)}', 'error')
+            print(f"Error in create_bill: {str(e)}")  # Add detailed logging
+            flash(str(e), 'error')
             return redirect(url_for('create_bill'))
     
     # GET request - show create bill form
@@ -701,8 +757,7 @@ def create_bill():
     return render_template('create_bill.html', 
                          patients=patients,
                          lab_services=lab_services,
-                         pharmacy_items=pharmacy_items,
-                         bill_items=[])
+                         pharmacy_items=pharmacy_items)
 
 @app.route('/view-bill/<int:bill_id>')
 @login_required
@@ -754,13 +809,26 @@ def edit_bill(bill_id):
     
     if request.method == 'POST':
         try:
-            # Extract form data
+            # Validate patient_id
             patient_id = request.form.get('patient_id')
-            bill_date = request.form.get('bill_date')
+            if not patient_id:
+                raise ValueError("Patient ID is required")
             
-            # Update bill details
+            patient = Patient.query.get(patient_id)
+            if not patient:
+                raise ValueError("Invalid patient selected")
+            
+            # Validate bill date
+            bill_date = request.form.get('bill_date')
+            if not bill_date:
+                raise ValueError("Bill date is required")
+            
+            try:
+                bill.bill_date = datetime.strptime(bill_date, '%Y-%m-%d')
+            except ValueError:
+                raise ValueError("Invalid date format. Use YYYY-MM-DD")
+            
             bill.patient_id = patient_id
-            bill.bill_date = datetime.strptime(bill_date, '%Y-%m-%d')
             
             # Process bill items
             item_types = request.form.getlist('item_type[]')
@@ -769,26 +837,75 @@ def edit_bill(bill_id):
             quantities = request.form.getlist('quantity[]')
             unit_prices = request.form.getlist('unit_price[]')
             total_prices = request.form.getlist('total_price[]')
-            bill_item_ids = request.form.getlist('bill_item_id[]')
+            
+            # Debug print to see exact form data
+            print("Form Data Debug:")
+            print(f"Item Types: {item_types}")
+            print(f"Item IDs: {item_ids}")
+            print(f"Descriptions: {descriptions}")
+            print(f"Quantities: {quantities}")
+            print(f"Unit Prices: {unit_prices}")
+            print(f"Total Prices: {total_prices}")
+            
+            # Validate bill items
+            if not item_types or len(item_types) == 0:
+                raise ValueError("At least one bill item is required")
             
             # Remove existing bill items
             BillItem.query.filter_by(bill_id=bill_id).delete()
             
-            # Add new bill items
+            # Add new bill items with type conversion and validation
+            total_bill_amount = 0.0
             for i in range(len(item_types)):
+                try:
+                    quantity = float(quantities[i])
+                    unit_price = float(unit_prices[i])
+                    total_price = float(total_prices[i])
+                except ValueError:
+                    raise ValueError(f"Invalid numeric value in bill item {i+1}")
+                
+                if quantity <= 0 or unit_price < 0:
+                    raise ValueError(f"Invalid quantity or price in bill item {i+1}")
+                
+                # Validate item type and item_id
+                if item_types[i] not in ['Lab Service', 'Pharmacy', 'Consultation']:
+                    raise ValueError(f"Invalid item type in bill item {i+1}")
+                
+                if item_types[i] == 'Lab Service':
+                    item = LabService.query.get(item_ids[i])
+                elif item_types[i] == 'Pharmacy':
+                    item = PharmacyItem.query.get(item_ids[i])
+                    
+                    # Check and reduce pharmacy item quantity
+                    if item:
+                        if item.quantity < quantity:
+                            raise ValueError(f"Insufficient stock for {item.name}. Available: {item.quantity}")
+                        
+                        # Reduce pharmacy item quantity
+                        item.quantity -= quantity
+                        print(f"Reduced {item.name} stock by {quantity}. Remaining: {item.quantity}")
+                    else:
+                        raise ValueError(f"Invalid pharmacy item in bill item {i+1}")
+                else:  # Consultation
+                    item = True  # Consultation is a special case
+                
                 bill_item = BillItem(
                     bill_id=bill_id,
                     item_type=item_types[i],
-                    item_id=item_ids[i],
-                    quantity=quantities[i],
+                    item_id=item_ids[i] if item_types[i] != 'Consultation' else None,
+                    quantity=quantity,
                     description=descriptions[i],
-                    unit_price=unit_prices[i],
-                    total_price=total_prices[i]
+                    unit_price=unit_price,
+                    total_price=total_price
                 )
                 db.session.add(bill_item)
+                total_bill_amount += total_price
             
             # Update bill total
-            bill.total_amount = sum(float(price) for price in total_prices)
+            bill.total_amount = total_bill_amount
+            
+            # Recalculate bill status
+            bill.status = 'Unpaid' if bill.total_amount > bill.paid_amount else 'Paid'
             
             db.session.commit()
             flash('Bill updated successfully', 'success')
@@ -796,7 +913,8 @@ def edit_bill(bill_id):
         
         except Exception as e:
             db.session.rollback()
-            flash(f'Error updating bill: {str(e)}', 'error')
+            print(f"Error in edit_bill: {str(e)}")  # Add detailed logging
+            flash(str(e), 'error')
             return redirect(url_for('edit_bill', bill_id=bill_id))
     
     # GET request - show edit form
@@ -867,6 +985,7 @@ def add_lab_result(bill_item_id):
             
             # Create new lab result
             new_lab_result = LabResult(
+                patient_id=bill_item.bill.patient_id,  # Add patient_id
                 bill_item_id=bill_item_id,
                 technician_id=current_lab_tech.id,
                 result_value=request.form.get('result_value', ''),
@@ -921,35 +1040,21 @@ def edit_lab_result(result_id):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        # Redirect to appropriate dashboard based on role
-        if current_user.role == 'admin':
-            return redirect(url_for('lab_services'))  # Redirect to lab services for admin
-        elif current_user.role == 'doctor':
-            return redirect(url_for('patient'))
-        elif current_user.role == 'lab_technician':
-            return redirect(url_for('lab_results'))
+        return redirect(url_for('index'))
     
     if request.method == 'POST':
+        # Get email and password from form
         email = request.form.get('email')
         password = request.form.get('password')
         
-        # Check if user exists
+        # Find user by email
         user = User.query.filter_by(email=email).first()
         
+        # Check if user exists and password is correct
         if user and user.check_password(password):
-            # Update last login time
-            user.last_login = datetime.utcnow()
-            db.session.commit()
-            
             login_user(user)
-            
-            # Redirect to appropriate dashboard based on role
-            if user.role == 'admin':
-                return redirect(url_for('lab_services'))  # Redirect to lab services for admin
-            elif user.role == 'doctor':
-                return redirect(url_for('patient'))
-            elif user.role == 'lab_technician':
-                return redirect(url_for('lab_results'))
+            flash('Login successful!', 'success')
+            return redirect(url_for('index'))
         else:
             flash('Invalid email or password', 'error')
     
@@ -1191,9 +1296,11 @@ def process_lab_service_request(request_id):
                 
                 # Create lab result entry
                 lab_result = LabResult(
+                    patient_id=lab_service_request.patient_id,  # Add patient_id
                     bill_item_id=bill_item.id,
                     technician_id=current_lab_technician.id if current_lab_technician else None,
                     result_value='Pending',
+                    reference_range=None,  # Add reference range
                     status='Pending',
                     remarks=notes or 'Lab service request approved',
                     performed_at=datetime.utcnow()
@@ -1302,6 +1409,25 @@ def edit_doctor(doctor_id):
         return redirect(url_for('doctors'))
         
     return render_template('edit_doctor.html', doctor=doctor)
+
+@app.route('/patient-bills/<int:patient_id>')
+@login_required
+@role_required(['admin', 'doctor', 'billing'])
+def patient_bills(patient_id):
+    # Get the patient
+    patient = Patient.query.get_or_404(patient_id)
+    
+    # Get all bills for this patient
+    all_bills = Bill.query.filter_by(patient_id=patient_id).order_by(Bill.bill_date.desc()).all()
+    
+    # Separate completed and ongoing bills
+    completed_bills = [bill for bill in all_bills if bill.status == 'Paid']
+    ongoing_bills = [bill for bill in all_bills if bill.status in ['Unpaid', 'Partial']]
+    
+    return render_template('patient_bills.html', 
+                         patient=patient, 
+                         completed_bills=completed_bills,
+                         ongoing_bills=ongoing_bills)
 
 if __name__ == '__main__':
     app.run(debug=True)

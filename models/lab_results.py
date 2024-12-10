@@ -5,7 +5,8 @@ class LabResult(db.Model):
     __tablename__ = 'lab_results'
     
     id = db.Column(db.Integer, primary_key=True)
-    bill_item_id = db.Column(db.Integer, db.ForeignKey('bill_items.id'), nullable=False)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patients.id'), nullable=False)
+    bill_item_id = db.Column(db.Integer, db.ForeignKey('bill_items.id'), nullable=True)
     technician_id = db.Column(db.Integer, db.ForeignKey('lab_technicians.id'), nullable=True)
     
     result_value = db.Column(db.Text, nullable=False)
@@ -18,12 +19,13 @@ class LabResult(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
+    patient = db.relationship('Patient', back_populates='lab_results')
     bill_item = db.relationship('BillItem', backref='lab_result')
     technician = db.relationship('LabTechnician', back_populates='lab_results')
     
     # Add patient relationship through bill
     @property
-    def patient(self):
+    def patient_through_bill(self):
         return self.bill_item.bill.patient if self.bill_item and self.bill_item.bill else None
     
     def __repr__(self):

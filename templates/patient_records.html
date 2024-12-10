@@ -8,6 +8,9 @@
             </div>
             <div class="col-sm-5 col-6 text-right m-b-30">
                 <a href="/add-record/{{ patient.id }}" class="btn btn-primary btn-rounded"><i class="fa fa-plus"></i> Add Record</a>
+                <a href="{{ url_for('patient_bills', patient_id=patient.id) }}" class="btn btn-info btn-rounded ml-2">
+                    <i class="fa fa-file-text-o"></i> View Bills
+                </a>
             </div>
         </div>
         <div class="row">
@@ -52,8 +55,20 @@
                                 <tr>
                                     <td>{{ record.created_at.strftime('%Y-%m-%d') }}</td>
                                     <td>Dr. {{ record.doctor.first_name }} {{ record.doctor.last_name }}</td>
-                                    <td>{{ record.diagnosis[:50] + '...' if record.diagnosis|length > 50 else record.diagnosis }}</td>
-                                    <td>{{ record.prescription[:50] + '...' if record.prescription and record.prescription|length > 50 else record.prescription or '-' }}</td>
+                                    <td>
+                                        {% if record.diagnosis %}
+                                            {{ record.diagnosis[:50] + '...' if record.diagnosis|length > 50 else record.diagnosis }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if record.prescription %}
+                                            {{ record.prescription[:50] + '...' if record.prescription|length > 50 else record.prescription }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
                                     <td>{{ record.next_visit.strftime('%Y-%m-%d') if record.next_visit else '-' }}</td>
                                     <td class="text-right">
                                         <div class="dropdown dropdown-action">
@@ -88,7 +103,7 @@
                                                 <div class="row">
                                                     <div class="col-md-12">
                                                         <p><strong>Diagnosis:</strong></p>
-                                                        <p>{{ record.diagnosis }}</p>
+                                                        <p>{{ record.diagnosis or '-' }}</p>
                                                     </div>
                                                 </div>
                                                 <div class="row">
@@ -119,59 +134,67 @@
         <div class="card-box mb-0">
             <h3 class="card-title">Lab Results</h3>
             <div class="table-responsive">
-                <table class="table table-striped custom-table">
+                <table class="table table-hover">
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>Lab Service</th>
                             <th>Result</th>
                             <th>Reference Range</th>
                             <th>Status</th>
-                            <th>Performed By</th>
-                            <th>Action</th>
+                            <th>Technician</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% set has_completed_results = false %}
-                        {% for bill_item in lab_results %}
-                            {% set lab_results_for_bill_item = bill_item.lab_result %}
-                            {% if lab_results_for_bill_item %}
-                                {% set has_completed_results = true %}
-                                {% for lab_result in lab_results_for_bill_item %}
-                                <tr>
-                                    <td>{{ bill_item.created_at.strftime('%Y-%m-%d') }}</td>
-                                    <td>{{ bill_item.description }}</td>
-                                    <td>{{ lab_result.result_value }}</td>
-                                    <td>{{ lab_result.reference_range or '-' }}</td>
-                                    <td>
-                                        <span class="custom-badge status-green">{{ lab_result.status }}</span>
-                                    </td>
-                                    <td>
-                                        {% if lab_result.technician %}
-                                            {{ lab_result.technician.first_name }} {{ lab_result.technician.last_name }}
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <a href="{{ url_for('view_lab_result', result_id=lab_result.id) }}" 
-                                           class="btn btn-primary btn-sm">
-                                            <i class="fa fa-eye"></i> View
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            {% endif %}
+                        {% if lab_results %}
+                            {% for lab_result in lab_results %}
+                            <tr>
+                                <td>{{ lab_result.created_at.strftime('%Y-%m-%d') if lab_result.created_at else '-' }}</td>
+                                <td>{{ lab_result.result_value or '-' }}</td>
+                                <td>{{ lab_result.reference_range or '-' }}</td>
+                                <td>
+                                    <span class="custom-badge status-green">
+                                        {{ lab_result.status or 'Unknown' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if lab_result.technician %}
+                                        {{ lab_result.technician.first_name }} {{ lab_result.technician.last_name }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('view_lab_result', result_id=lab_result.id) }}" 
+                                       class="btn btn-primary btn-sm">
+                                        <i class="fa fa-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
                         {% else %}
                         <tr>
-                            <td colspan="7" class="text-center">No completed lab results found</td>
+                            <td colspan="6" class="text-center">No completed lab results found</td>
                         </tr>
-                        {% endfor %}
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
+
+            {% if invalid_lab_results %}
+            <div class="alert alert-warning mt-3">
+                <strong>Warning:</strong> Some lab results could not be processed:
+                <ul>
+                    {% for invalid_result in invalid_lab_results %}
+                    <li>
+                        Lab Result ID: {{ invalid_result.id }} 
+                        (Bill Item ID: {{ invalid_result.bill_item_id or 'Unknown' }})
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
     </div>
-</div>
 </div>
 {% endblock %}

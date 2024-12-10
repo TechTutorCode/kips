@@ -23,6 +23,9 @@ instance/*
 # Logs
 *.log
 
+# Specific database file in instance folder
+instance/kips.db
+
 # IDE-specific files
 .vscode/
 .idea/

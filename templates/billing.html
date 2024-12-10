@@ -10,8 +10,11 @@
                 <a href="{{ url_for('create_bill') }}" class="btn btn-primary btn-rounded float-right"><i class="fa fa-plus"></i> Create Bill</a>
             </div>
         </div>
+
+        <!-- Pending Bills Section -->
         <div class="row">
             <div class="col-md-12">
+                <h5>Pending Bills</h5>
                 <div class="table-responsive">
                     <table class="table table-striped custom-table datatable">
                         <thead>
@@ -27,7 +30,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for bill in bills %}
+                            {% for bill in pending_bills %}
                             <tr>
                                 <td><a href="{{ url_for('view_bill', bill_id=bill.id) }}">#BILL{{ bill.id }}</a></td>
                                 <td>{{ bill.patient.first_name }} {{ bill.patient.last_name }}</td>
@@ -36,9 +39,7 @@
                                 <td>KES {{ "{:,.2f}".format(bill.paid_amount) }}</td>
                                 <td>KES {{ "{:,.2f}".format(bill.balance) }}</td>
                                 <td>
-                                    {% if bill.status == 'Paid' %}
-                                        <span class="custom-badge status-green">{{ bill.status }}</span>
-                                    {% elif bill.status == 'Partial' %}
+                                    {% if bill.status == 'Partial' %}
                                         <span class="custom-badge status-orange">{{ bill.status }}</span>
                                     {% else %}
                                         <span class="custom-badge status-red">{{ bill.status }}</span>
@@ -51,6 +52,52 @@
                                             <a class="dropdown-item" href="{{ url_for('view_bill', bill_id=bill.id) }}"><i class="fa fa-eye m-r-5"></i> View</a>
                                             <a class="dropdown-item" href="{{ url_for('edit_bill', bill_id=bill.id) }}"><i class="fa fa-pencil m-r-5"></i> Edit</a>
                                             <a class="dropdown-item" href="{{ url_for('add_payment', bill_id=bill.id) }}"><i class="fa fa-money m-r-5"></i> Add Payment</a>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Completed Bills Section -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <h5>Completed Bills</h5>
+                <div class="table-responsive">
+                    <table class="table table-striped custom-table datatable">
+                        <thead>
+                            <tr>
+                                <th>Bill #</th>
+                                <th>Patient</th>
+                                <th>Bill Date</th>
+                                <th>Total Amount</th>
+                                <th>Paid Amount</th>
+                                <th>Balance</th>
+                                <th>Status</th>
+                                <th class="text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for bill in completed_bills %}
+                            <tr>
+                                <td><a href="{{ url_for('view_bill', bill_id=bill.id) }}">#BILL{{ bill.id }}</a></td>
+                                <td>{{ bill.patient.first_name }} {{ bill.patient.last_name }}</td>
+                                <td>{{ bill.bill_date.strftime('%Y-%m-%d') }}</td>
+                                <td>KES {{ "{:,.2f}".format(bill.total_amount) }}</td>
+                                <td>KES {{ "{:,.2f}".format(bill.paid_amount) }}</td>
+                                <td>KES {{ "{:,.2f}".format(bill.balance) }}</td>
+                                <td>
+                                    <span class="custom-badge status-green">{{ bill.status }}</span>
+                                </td>
+                                <td class="text-right">
+                                    <div class="dropdown dropdown-action">
+                                        <a href="#" class="action-icon dropdown-toggle" data-toggle="dropdown" aria-expanded="false"><i class="fa fa-ellipsis-v"></i></a>
+                                        <div class="dropdown-menu dropdown-menu-right">
+                                            <a class="dropdown-item" href="{{ url_for('view_bill', bill_id=bill.id) }}"><i class="fa fa-eye m-r-5"></i> View</a>
                                         </div>
                                     </div>
                                 </td>

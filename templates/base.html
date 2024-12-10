@@ -24,7 +24,7 @@
     <div class="main-wrapper">
         <div class="header">
 			<div class="header-left">
-				<a href="index-2.html" class="logo">
+				<a href="/" class="logo">
 					<img src="/static/assets/img/kipsnobglogo.png" width="200" height="60" alt=""> 
 				</a>
 			</div>
@@ -103,11 +103,11 @@
                             
                             {% if current_user.role == 'admin' %}
                             <li>
-                                <a href="{{ url_for('add_doctor') }}"><i class="fa fa-user-md"></i> <span>Doctors</span></a>
+                                <a href="{{ url_for('doctors') }}"><i class="fa fa-user-md"></i> <span>Doctors</span></a>
                             </li>
-                            <li>
+                            <!-- <li>
                                 <a href="{{ url_for('lab_technicians') }}"><i class="fa fa-user-md"></i> <span>Lab Technicians</span></a>
-                            </li>
+                            </li> -->
                             <li>
                                 <a href="{{ url_for('pharmacy') }}"><i class="fa fa-medkit"></i> <span>Pharmacy</span></a>
                             </li>
