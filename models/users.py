@@ -26,7 +26,7 @@ class User(UserMixin, db.Model):
         self.role = role
         self.doctor_id = doctor_id
         if password:
-            self.password_hash = generate_password_hash(password)
+            self.password_hash = generate_password_hash(password, method='pbkdf2:sha256')
 
     def get_id(self):
         return str(self.id)
