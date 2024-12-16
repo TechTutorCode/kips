@@ -1467,9 +1467,14 @@ def request_medicine(patient_id):
         return jsonify({"error": "Missing required medicine request fields"}), 400
     
     try:
+        print(current_user.id)
+        print(current_user.email)
+        doctor = Doctor.query.filter_by(email=current_user.email).first()
+        print(doctor.id)
         # Create medicine request
         medicine_request = MedicineRequest(
-            doctor_id=current_user.id,
+            
+            doctor_id=doctor.id,
             patient_id=patient_id,
             medicine_name=medicine_name,
             dosage=dosage,
