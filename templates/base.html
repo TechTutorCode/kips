@@ -14,6 +14,9 @@
     <link rel="stylesheet" type="text/css" href="/static/assets/css/select2.min.css">
     <link rel="stylesheet" type="text/css" href="/static/assets/css/bootstrap-datetimepicker.min.css">
     <link rel="stylesheet" type="text/css" href="/static/assets/css/style.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+ 
+    <link rel="stylesheet" href="//cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css">
     <!--[if lt IE 9]>
 		<script src="assets/js/html5shiv.min.js"></script>
 		<script src="assets/js/respond.min.js"></script>
@@ -100,7 +103,19 @@
                             </li>
                             {% endif %}
                             {% endif %}
-                            
+                            {% if current_user.role in ['admin', 'pharmacist'] %}
+                            <li>
+                                <a href="{{ url_for('billing') }}"><i class="fa fa-money"></i> <span>Billings</span></a>
+                            </li>
+                            <li>
+                                <a href="{{ url_for('view_medicine_requests') }}"><i class="fa fa-medkit"></i> <span>Medicine Requests</span></a>
+                            </li>
+                            {% endif %}
+                            {% if current_user.role == 'admin', 'pharmacist' %}
+                            <li>
+                                <a href="{{ url_for('pharmacy') }}"><i class="fa fa-medkit"></i> <span>Pharmacy</span></a>
+                            </li>
+                            {% endif %}
                             {% if current_user.role == 'admin' %}
                             <li>
                                 <a href="{{ url_for('doctors') }}"><i class="fa fa-user-md"></i> <span>Doctors</span></a>
@@ -108,9 +123,7 @@
                             <!-- <li>
                                 <a href="{{ url_for('lab_technicians') }}"><i class="fa fa-user-md"></i> <span>Lab Technicians</span></a>
                             </li> -->
-                            <li>
-                                <a href="{{ url_for('pharmacy') }}"><i class="fa fa-medkit"></i> <span>Pharmacy</span></a>
-                            </li>
+                          
                             <li>
                                 <a href="{{ url_for('billing') }}"><i class="fa fa-money"></i> <span>Billing</span></a>
                             </li>
@@ -138,6 +151,7 @@
                                     <span>Lab Service Requests</span>
                                 </a>
                             </li>
+                            
                             {% endif %}
                         {% endif %}
                     </ul>

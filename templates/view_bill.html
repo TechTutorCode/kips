@@ -23,8 +23,8 @@
                             <div class="col-6 col-sm-6 m-b-20">
                                 <img src="{{ url_for('static', filename='img/logo.png') }}" class="inv-logo" alt="">
                                 <ul class="list-unstyled">
-                                    <li>KIPS Clinic</li>
-                                    <li>Nairobi, Kenya</li>
+                                    <li>KIPS Medical Center Limited</li>
+                                    <li>Turkana, Kenya</li>
                                 </ul>
                             </div>
                             <div class="col-6 col-sm-6 m-b-20">
@@ -53,7 +53,6 @@
                                     <tr>
                                         <th>#</th>
                                         <th>ITEM</th>
-                                        <th>DESCRIPTION</th>
                                         <th>QUANTITY</th>
                                         <th>UNIT PRICE</th>
                                         <th>TOTAL</th>
@@ -64,7 +63,6 @@
                                     <tr>
                                         <td>{{ loop.index }}</td>
                                         <td>{{ item.item_type }}</td>
-                                        <td>{{ item.description }}</td>
                                         <td>{{ item.quantity }}</td>
                                         <td>KES {{ "{:,.2f}".format(item.unit_price) }}</td>
                                         <td>KES {{ "{:,.2f}".format(item.total_price) }}</td>

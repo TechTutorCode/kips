@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-wrapper">
+    <div class="content">
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title">Update Medicine Request Status</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('update_medicine_request_status', request_id=medicine_request.id) }}">
+                            <div class="form-group">
+                                <label>Patient Name</label>
+                                <input type="text" class="form-control" 
+                                       value="{{ medicine_request.patient.first_name }} {{ medicine_request.patient.last_name }}" 
+                                       readonly>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Medicine Name</label>
+                                <input type="text" class="form-control" 
+                                       value="{{ medicine_request.medicine_name }}" 
+                                       readonly>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Current Status</label>
+                                <input type="text" class="form-control" 
+                                       value="{{ medicine_request.status }}" 
+                                       readonly>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="status">Update Status</label>
+                                <select name="status" id="status" class="form-control" required>
+                                    <option value="Pending" {% if medicine_request.status == 'Pending' %}selected{% endif %}>Pending</option>
+                                    <option value="Provided" {% if medicine_request.status == 'Provided' %}selected{% endif %}>Provided</option>
+                                    <option value="Sent to Buy" {% if medicine_request.status == 'Sent to Buy' %}selected{% endif %}>Sent to Buy</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Quantity</label>
+                                <input type="text" class="form-control" 
+                                       value="{{ medicine_request.quantity }}" 
+                                       readonly>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Prescribed By</label>
+                                <input type="text" class="form-control" 
+                                       value="Dr. {{ medicine_request.doctor.first_name }} {{ medicine_request.doctor.last_name }}" 
+                                       readonly>
+                            </div>
+                            
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-primary">Update Status</button>
+                                <a href="{{ url_for('view_medicine_requests') }}" class="btn btn-secondary ml-2">Cancel</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

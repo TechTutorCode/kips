@@ -8,7 +8,9 @@ from datetime import datetime
 
 # Initialize Flask app
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///kips.db"
+
+app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:#Deno0707@204.12.205.217:5432/kips"
+# app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///kips.db"
 app.config["SECRET_KEY"] = "#deno0707@mwangi"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -31,6 +33,7 @@ from models.pharmacy import PharmacyItem
 from models.billing import Bill, BillItem, Payment
 from models.lab_technicians import LabTechnician
 from models.lab_service_requests import LabServiceRequest
+from models.medicine_requests import MedicineRequest
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -74,6 +77,12 @@ with app.app_context():
                 'email': 'billing@kips.com',
                 'password': 'billing123',
                 'role': 'billing'
+            }
+            ,
+            {
+                'email': 'pharmacist@kips.com',
+                'password': 'pharmacist123',
+                'role': 'pharmacist'
             }
         ]
         
@@ -371,11 +380,13 @@ def patient_records(patient_id):
         print(f"Result Value: {lab_result.result_value}")
         print(f"Reference Range: {lab_result.reference_range}")
         print("---")
-    
+    # Fetch medicine requests
+    medicine_requests = MedicineRequest.query.filter_by(patient_id=patient_id).order_by(MedicineRequest.created_at.desc()).all()
     return render_template('patient_records.html', 
                          patient=patient, 
                          records=records,
-                         lab_results=completed_lab_results)
+                         lab_results=completed_lab_results,
+                         medicine_requests=medicine_requests)
 
 @app.route('/add-record/<int:patient_id>', methods=['GET', 'POST'])
 @login_required
@@ -539,7 +550,7 @@ def pharmacy():
 
 @app.route('/add-pharmacy-item', methods=['GET', 'POST'])
 @login_required
-@role_required(['admin'])
+@role_required(['admin', 'pharmacist'])
 def add_pharmacy_item():
     if request.method == 'POST':
         try:
@@ -634,7 +645,7 @@ def billing():
 
 @app.route('/create-bill', methods=['GET', 'POST'])
 @login_required
-@role_required(['admin', 'billing'])
+@role_required(['admin', 'billing', 'pharmacist'])
 def create_bill():
     if request.method == 'POST':
         try:
@@ -803,7 +814,7 @@ def add_payment(bill_id):
 
 @app.route('/edit_bill/<int:bill_id>', methods=['GET', 'POST'])
 @login_required
-@role_required(['admin', 'billing'])
+@role_required(['admin', 'billing', 'pharmacist'])
 def edit_bill(bill_id):
     bill = Bill.query.get_or_404(bill_id)
     
@@ -1428,6 +1439,183 @@ def patient_bills(patient_id):
                          patient=patient, 
                          completed_bills=completed_bills,
                          ongoing_bills=ongoing_bills)
+
+@app.route('/request-medicine/<int:patient_id>', methods=['POST'])
+@login_required
+def request_medicine(patient_id):
+    # Ensure only doctors can request medicine
+    if not current_user.doctor:
+        return jsonify({"error": "Unauthorized: Only doctors can request medicine"}), 403
+    
+    # Validate patient exists
+    patient = Patient.query.get_or_404(patient_id)
+    
+    # Get form data
+    medicine_name = request.form.get('medicine_name')
+    dosage = request.form.get('dosage')
+    frequency = request.form.get('frequency')
+    duration = request.form.get('duration')
+    notes = request.form.get('notes')
+    
+    # Validate required fields
+    if not all([medicine_name, dosage, frequency]):
+        return jsonify({"error": "Missing required medicine request fields"}), 400
+    
+    try:
+        # Create medicine request
+        medicine_request = MedicineRequest(
+            doctor_id=current_user.id,
+            patient_id=patient_id,
+            medicine_name=medicine_name,
+            dosage=dosage,
+            frequency=frequency,
+            duration=duration,
+            notes=notes,
+            status='Pending'
+        )
+        
+        db.session.add(medicine_request)
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Medicine request submitted successfully",
+            "request_id": medicine_request.id
+        }), 201
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/update-medicine-request', methods=['POST'])
+@login_required
+def update_medicine_request():
+    # Ensure only doctors can update medicine requests
+    if not current_user.doctor:
+        return jsonify({"error": "Unauthorized: Only doctors can update medicine requests"}), 403
+    
+    # Get form data
+    request_id = request.form.get('request_id')
+    medicine_name = request.form.get('medicine_name')
+    dosage = request.form.get('dosage')
+    frequency = request.form.get('frequency')
+    duration = request.form.get('duration')
+    notes = request.form.get('notes')
+    
+    # Validate required fields
+    if not all([request_id, medicine_name, dosage, frequency]):
+        return jsonify({"error": "Missing required medicine request fields"}), 400
+    
+    try:
+        # Find existing medicine request
+        medicine_request = MedicineRequest.query.get_or_404(request_id)
+        
+        # Update medicine request
+        medicine_request.medicine_name = medicine_name
+        medicine_request.dosage = dosage
+        medicine_request.frequency = frequency
+        medicine_request.duration = duration or None
+        medicine_request.notes = notes or None
+        
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Medicine request updated successfully",
+            "request_id": medicine_request.id
+        }), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/delete-medicine-request/<int:request_id>', methods=['POST'])
+@login_required
+def delete_medicine_request(request_id):
+    try:
+        medicine_request = MedicineRequest.query.get_or_404(request_id)
+        
+        db.session.delete(medicine_request)
+        db.session.commit()
+        
+        return jsonify({'message': 'Medicine request deleted successfully'}), 200
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/medicine-requests")
+@login_required
+@role_required(['pharmacist', 'admin'])
+def view_medicine_requests():
+    """
+    View all medicine requests for pharmacists
+    """
+    # Get all medicine requests, ordered by most recent first
+    medicine_requests = MedicineRequest.query.order_by(MedicineRequest.created_at.desc()).all()
+    
+    return render_template('medicine_requests.html', 
+                           medicine_requests=medicine_requests, 
+                           title='Medicine Requests')
+
+@app.route("/patient-medicine-history/<int:patient_id>")
+@login_required
+@role_required(['pharmacist', 'admin', 'doctor'])
+def view_patient_medicine_history(patient_id):
+    """
+    View medicine request history for a specific patient
+    """
+    # Get patient details
+    patient = Patient.query.get_or_404(patient_id)
+    
+    # Get all medicine requests for this patient, ordered by most recent first
+    medicine_requests = MedicineRequest.query.filter_by(patient_id=patient_id)\
+        .order_by(MedicineRequest.created_at.desc()).all()
+    
+    return render_template('patient_medicine_history.html', 
+                           patient=patient, 
+                           medicine_requests=medicine_requests, 
+                           title=f'Medicine History for {patient.first_name} {patient.last_name}')
+
+@app.route('/update-medicine-request/<int:request_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['pharmacist', 'admin', 'doctor'])
+def update_medicine_request_status(request_id):
+    """
+    Update the status of a medicine request
+    """
+    # Fetch the specific medicine request
+    medicine_request = MedicineRequest.query.get_or_404(request_id)
+    
+    if request.method == 'POST':
+        try:
+            # Get the new status from the form
+            new_status = request.form.get('status')
+            
+            # Validate status
+            valid_statuses = ['Pending', 'Provided', 'Sent to Buy']
+            if new_status not in valid_statuses:
+                flash('Invalid status selected.', 'error')
+                return redirect(url_for('view_medicine_requests'))
+            
+            # Update the status
+            medicine_request.status = new_status
+            
+            # Commit changes
+            db.session.commit()
+            
+            # Success message
+            flash(f'Medicine request status updated to {new_status}.', 'success')
+            
+            return redirect(url_for('view_medicine_requests'))
+        
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating medicine request: {str(e)}', 'error')
+            return redirect(url_for('view_medicine_requests'))
+    
+    # GET request: show update form
+    return render_template('update_medicine_request.html', 
+                           medicine_request=medicine_request, 
+                           title='Update Medicine Request Status')
 
 if __name__ == '__main__':
     app.run(debug=True)
