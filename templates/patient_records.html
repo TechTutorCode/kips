@@ -447,7 +447,7 @@ $(document).ready(function() {
                 var errorMsg = xhr.responseJSON && xhr.responseJSON.error 
                     ? xhr.responseJSON.error 
                     : 'Failed to update medicine request';
-                toastr.error(errorMsg);
+                console.log(errorMsg);
             }
         });
     });
@@ -477,7 +477,7 @@ $(document).ready(function() {
                 var errorMsg = xhr.responseJSON && xhr.responseJSON.error 
                     ? xhr.responseJSON.error 
                     : 'Failed to submit medicine request';
-                toastr.error(errorMsg);
+                console.log(errorMsg);
             }
         });
     });

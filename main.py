@@ -9,8 +9,8 @@ from datetime import datetime
 # Initialize Flask app
 app = Flask(__name__)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:#Deno0707@204.12.205.217:5432/kips"
-# app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///kips.db"
+# app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:#Deno0707@204.12.205.217:5432/kips"
+app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///kips.db"
 app.config["SECRET_KEY"] = "#deno0707@mwangi"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -83,6 +83,11 @@ with app.app_context():
                 'email': 'pharmacist@kips.com',
                 'password': 'pharmacist123',
                 'role': 'pharmacist'
+            },
+            {
+                'email': 'labtech@kips.com',
+                'password': 'labtech123',
+                'role': 'lab_technician'
             }
         ]
         
