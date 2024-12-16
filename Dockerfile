@@ -9,6 +9,8 @@ ENV OAUTHLIB_INSECURE_TRANSPORT=0
 # RUN pip install -U pip
 RUN pip install -r /tmp/requirements.txt
 RUN pip install flask_sqlalchemy
+RUN pip install cryptography
+
 
 # copy over our org code
 COPY . .
