@@ -107,8 +107,36 @@
                                         </div>
                                     </td>
                                 </tr>
-                                
-                                <!-- Record Details Modal -->
+                                <style>
+                                    @media print {
+    body * {
+        visibility: hidden;
+    }
+    #printable-section, #printable-section * {
+        visibility: visible;
+    }
+    #printable-section {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+    }
+    .print-button-container {
+    display: flex;
+    justify-content: flex-end; /* Align the button to the right */
+    width: 100%; /* Ensure the container spans the full width */
+}
+
+.btn-group-sm {
+    margin: 0; /* Optional: Adjust margins for precise positioning */
+}
+
+}
+
+                                </style>
+        <div id="printable-section">                       <!-- Record Details Modal -->
                                 <div id="view_record_{{ record.id }}" class="modal fade" role="dialog">
                                     <div class="modal-dialog modal-lg">
                                         <div class="modal-content">
@@ -116,6 +144,33 @@
                                                 <h5 class="modal-title">Medical Record Details</h5>
                                                 <button type="button" class="close" data-dismiss="modal">&times;</button>
                                             </div>
+                                            <div class="btn-group btn-group-sm print-button-container">
+                                                <button class="btn btn-white" onclick="printSection('printable-section')">
+                                                    <i class="fa fa-print fa-lg"></i> Print
+                                                </button>
+                                            </div>
+                                            
+                                            
+                                            <script>
+                                                function printSection(sectionId) {
+                                                    const section = document.getElementById(sectionId);
+                                                    if (!section) {
+                                                        alert('Section not found!');
+                                                        return;
+                                                    }
+                                                    const originalContent = document.body.innerHTML;
+                                                    const sectionContent = section.innerHTML;
+                                            
+                                                    // Temporarily replace the body content with the section's content
+                                                    document.body.innerHTML = sectionContent;
+                                                    window.print();
+                                            
+                                                    // Restore the original content
+                                                    document.body.innerHTML = originalContent;
+                                                    window.location.reload(); // Reload to ensure proper functionality
+                                                }
+                                            </script>
+                                            
                                             <div class="modal-body">
                                                 <div class="row">
                                                     <div class="col-md-6">
@@ -146,6 +201,7 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
                                 {% endfor %}
                             </tbody>
                         </table>

@@ -1,6 +1,35 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="page-wrapper">
+    <style>
+        @media print {
+body * {
+visibility: hidden;
+}
+#printable-section, #printable-section * {
+visibility: visible;
+}
+#printable-section {
+position: absolute;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+overflow: hidden;
+}
+.print-button-container {
+display: flex;
+justify-content: flex-end; /* Align the button to the right */
+width: 100%; /* Ensure the container spans the full width */
+}
+
+.btn-group-sm {
+margin: 0; /* Optional: Adjust margins for precise positioning */
+}
+
+}
+
+    </style>
     <div class="content">
         <div class="row">
             <div class="col-sm-12">
@@ -8,8 +37,34 @@
             </div>
         </div>
         <div class="row">
+            <div class="btn-group btn-group-sm print-button-container">
+                <button class="btn btn-white" onclick="printSection('printable-section')">
+                    <i class="fa fa-print fa-lg"></i> Print
+                </button>
+            </div>
+            
+            
+            <script>
+                function printSection(sectionId) {
+                    const section = document.getElementById(sectionId);
+                    if (!section) {
+                        alert('Section not found!');
+                        return;
+                    }
+                    const originalContent = document.body.innerHTML;
+                    const sectionContent = section.innerHTML;
+            
+                    // Temporarily replace the body content with the section's content
+                    document.body.innerHTML = sectionContent;
+                    window.print();
+            
+                    // Restore the original content
+                    document.body.innerHTML = originalContent;
+                    window.location.reload(); // Reload to ensure proper functionality
+                }
+            </script>
             <div class="col-md-12">
-                <div class="card">
+                <div class="card" id="printable-section">
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6">
