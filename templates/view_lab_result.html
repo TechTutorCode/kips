@@ -3,121 +3,148 @@
 <div class="page-wrapper">
     <style>
         @media print {
-body * {
-visibility: hidden;
-}
-#printable-section, #printable-section * {
-visibility: visible;
-}
-#printable-section {
-position: absolute;
-top: 0;
-left: 0;
-width: 100%;
-height: 100%;
-overflow: hidden;
-}
-.print-button-container {
-display: flex;
-justify-content: flex-end; /* Align the button to the right */
-width: 100%; /* Ensure the container spans the full width */
-}
+            * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+            @page {
+                size: A4;
+                margin: 0.5cm;
+            }
+            body * {
+                visibility: hidden;
+                margin: 0;
+                padding: 0;
+            }
+            #printable-section, #printable-section * {
+                visibility: visible;
+            }
+            #printable-section {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            .report-box {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 10px !important;
+                box-shadow: none;
+                border: none;
+            }
+            .report-header, .report-section {
+                width: 100% !important;
+                margin-left: 0 !important;
+                padding-left: 0 !important;
+            }
+            table {
+                width: 100% !important;
+                margin-left: 0 !important;
+            }
+            .print-button-container {
+                display: none;
+            }
+        }
 
-.btn-group-sm {
-margin: 0; /* Optional: Adjust margins for precise positioning */
-}
-
-}
-
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .report-wrapper {
+            padding: 20px;
+        }
+        .report-box {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .report-header {
+            text-align: center;
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .report-section {
+            margin: 20px 0;
+            padding: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .report-signature {
+            margin-top: 40px;
+            text-align: right;
+        }
+        .print-button-container {
+            text-align: right;
+            margin-bottom: 10px;
+        }
+        .print-button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            cursor: pointer;
+        }
     </style>
+
     <div class="content">
-        <div class="row">
-            <div class="col-sm-12">
-                <h4 class="page-title">Lab Result Details</h4>
-            </div>
+        <div class="print-button-container">
+            <button class="print-button" onclick="window.print()">Print Report</button>
         </div>
-        <div class="row">
-            <div class="btn-group btn-group-sm print-button-container">
-                <button class="btn btn-white" onclick="printSection('printable-section')">
-                    <i class="fa fa-print fa-lg"></i> Print
-                </button>
-            </div>
-            
-            
-            <script>
-                function printSection(sectionId) {
-                    const section = document.getElementById(sectionId);
-                    if (!section) {
-                        alert('Section not found!');
-                        return;
-                    }
-                    const originalContent = document.body.innerHTML;
-                    const sectionContent = section.innerHTML;
-            
-                    // Temporarily replace the body content with the section's content
-                    document.body.innerHTML = sectionContent;
-                    window.print();
-            
-                    // Restore the original content
-                    document.body.innerHTML = originalContent;
-                    window.location.reload(); // Reload to ensure proper functionality
-                }
-            </script>
-            <div class="col-md-12">
-                <div class="card" id="printable-section">
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h5 class="card-title">Patient Information</h5>
-                                <p><strong>Name:</strong> {{ result.patient.first_name }} {{ result.patient.last_name }}</p>
-                                <p><strong>Patient ID:</strong> {{ result.patient.id }}</p>
-                            </div>
-                            <div class="col-md-6">
-                                <h5 class="card-title">Lab Service Details</h5>
-                                <p><strong>Service:</strong> {{ result.bill_item.description }}</p>
-                                <p><strong>Performed At:</strong> {{ result.performed_at.strftime('%Y-%m-%d %H:%M:%S') if result.performed_at else 'Not specified' }}</p>
-                            </div>
-                        </div>
-                        <div class="row mt-3">
-                            <div class="col-md-6">
-                                <h5 class="card-title">Result Details</h5>
-                                <p><strong>Result Value:</strong> {{ result.result_value }}</p>
-                                <p><strong>Reference Range:</strong> {{ result.reference_range or 'Not specified' }}</p>
-                            </div>
-                            <div class="col-md-6">
-                                <h5 class="card-title">Status</h5>
-                                <p>
-                                    <strong>Status:</strong> 
-                                    <span class="badge 
-                                        {% if result.status == 'Completed' %}badge-success
-                                        {% elif result.status == 'Pending' %}badge-warning
-                                        {% else %}badge-danger
-                                        {% endif %}">
-                                        {{ result.status }}
-                                    </span>
-                                </p>
-                                {% if result.technician %}
-                                <p><strong>Performed By:</strong> {{ result.technician.first_name }} {{ result.technician.last_name }}</p>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% if result.remarks %}
-                        <div class="row mt-3">
-                            <div class="col-md-12">
-                                <h5 class="card-title">Remarks</h5>
-                                <p>{{ result.remarks }}</p>
-                            </div>
-                        </div>
-                        {% endif %}
-                        <div class="row mt-3">
-                            <div class="col-md-12 text-right">
-                                <a href="{{ url_for('lab_results') }}" class="btn btn-secondary">Back to Lab Results</a>
-                                {% if current_user.role in ['admin', 'lab_technician'] %}
-                                <a href="{{ url_for('edit_lab_result', result_id=result.id) }}" class="btn btn-primary">Edit Result</a>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
+
+        <div class="report-wrapper" id="printable-section">
+            <div class="report-box">
+                <div class="report-header">
+                    <h1>Kips Medical Centre</h1>
+                    <p>Turkana, Kenya</p>
+                    <p>Phone: (123) 456-7890 | Email: info@kipsMedical.com</p>
+                </div>
+
+                <div class="report-section">
+                    <h2>Patient Information</h2>
+                    <p><strong>Name:</strong> {{result.patient.first_name}} {{result.patient.last_name}}</p>
+                    <p><strong>Gender:</strong> {{result.patient.gender}}</p>
+                    <p><strong>Sample ID:</strong> {{result.id}}</p>
+                    <p><strong>Date of Test:</strong> {{result.performed_at.strftime('%B %d, %Y')}}</p>
+                    <p><strong>Date of Birth:</strong> {{result.patient.dob}}</p>
+                </div>
+
+                <div class="report-section">
+                    <h2>Test Results</h2>
+                    <table>
+                        <tr>
+                            <th>Test</th>
+                            <th>Result</th>
+                        </tr>
+                        <tr>
+                            <td>{{result.bill_item.description}}</td>
+                            <td>{{result.result_value}}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="report-signature">
+                    <p><strong>Done By</strong></p>
+                    <p>Lab Technician</p>
                 </div>
             </div>
         </div>

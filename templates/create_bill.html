@@ -147,14 +147,32 @@
 {% block scripts %}
 <script>
     $(document).ready(function() {
-        // Store options HTML
-        const labOptions = $('.lab-options').html();
-        const pharmacyOptions = $('.pharmacy-options').html();
-        const consultationOption = $('.consultation-option').html();
+    // Store options HTML
+    const labOptions = $('.lab-options').html();
+    const pharmacyOptions = $('.pharmacy-options').html();
+    const consultationOption = $('.consultation-option').html();
+    
+    // Function to add a new row
+    function addNewRow() {
+        const newRow = $('#billItems tbody tr:first').clone();
         
-        // Handle item type change
-        $(document).on('change', '.item-type', function() {
-            const row = $(this).closest('tr');
+        // Reset all input fields
+        newRow.find('select').val('');
+        newRow.find('input').val('');
+        
+        // Reset item select options
+        newRow.find('.item-select').html('<option value="">Select Item</option>');
+        
+        $('#billItems tbody').append(newRow);
+        
+        // Reattach event listeners
+        attachRowListeners(newRow);
+    }
+    
+    // Attach event listeners to row elements
+    function attachRowListeners(row) {
+        // Item type change handler
+        row.find('.item-type').on('change', function() {
             const itemSelect = row.find('.item-select');
             const itemType = $(this).val();
             
@@ -177,113 +195,88 @@
             row.find('.item-total').val('');
             calculateTotal();
         });
-
-        // Handle item selection
-        $(document).on('change', '.item-select', function() {
-            const row = $(this).closest('tr');
+        
+        // Item select change handler
+        row.find('.item-select').on('change', function() {
             const selectedOption = $(this).find('option:selected');
+            const row = $(this).closest('tr');
             
-            const price = selectedOption.data('cost') || selectedOption.data('price') || 0;
-            const description = selectedOption.data('description') || selectedOption.data('desc') || selectedOption.text();
+            // Set description and price
+            row.find('.item-description').val(selectedOption.data('desc') || selectedOption.data('description'));
+            row.find('.item-price').val(selectedOption.data('price') || selectedOption.data('cost'));
             
-            row.find('.item-description').val(description);
-            row.find('.item-price').val(price);
-            row.find('.item-quantity').attr('max', selectedOption.data('stock') || 9999);
-            
+            // Update total
             updateRowTotal(row);
             calculateTotal();
         });
-
-        // Add new row
-        $('#addRow').click(function() {
-            const newRow = $('#billItems tbody tr:first').clone();
-            newRow.find('input').val('');
-            newRow.find('select').val('');
-            // Remove all options except first in the new row
-            newRow.find('.item-select option:not(:first)').remove();
-            $('#billItems tbody').append(newRow);
+        
+        // Quantity change handler
+        row.find('.item-quantity').on('input', function() {
+            const row = $(this).closest('tr');
+            updateRowTotal(row);
+            calculateTotal();
         });
-
-        // Delete row
-        $(document).on('click', '.delete-row', function() {
+        
+        // Delete row handler
+        row.find('.delete-row').on('click', function() {
             if ($('#billItems tbody tr').length > 1) {
                 $(this).closest('tr').remove();
                 calculateTotal();
+            } else {
+                alert('At least one bill item is required.');
             }
         });
-
-        // Handle quantity change
-        $(document).on('change', '.item-quantity', function() {
-            const row = $(this).closest('tr');
-            const quantity = parseInt($(this).val()) || 0;
-            
-            if (quantity < 1) {
-                $(this).val(1);
-            }
-            
-            updateRowTotal(row);
+    }
+    
+    // Initial row listeners
+    attachRowListeners($('#billItems tbody tr'));
+    
+    // Add row button
+    $('#addRow').on('click', addNewRow);
+    
+    // Update row total
+    function updateRowTotal(row) {
+        const quantity = parseFloat(row.find('.item-quantity').val()) || 0;
+        const unitPrice = parseFloat(row.find('.item-price').val()) || 0;
+        const totalPrice = quantity * unitPrice;
+        row.find('.item-total').val(totalPrice.toFixed(2));
+    }
+    
+    // Calculate total amount
+    function calculateTotal() {
+        let total = 0;
+        $('#billItems tbody tr').each(function() {
+            const rowTotal = parseFloat($(this).find('.item-total').val()) || 0;
+            total += rowTotal;
         });
-
-        // Update row total
-        function updateRowTotal(row) {
-            const quantity = parseFloat(row.find('.item-quantity').val()) || 0;
-            const price = parseFloat(row.find('.item-price').val()) || 0;
-            const total = quantity * price;
-            row.find('.item-total').val(total.toFixed(2));
-            calculateTotal();
-        }
-
-        // Calculate total amount
-        function calculateTotal() {
-            let total = 0;
-            $('.item-total').each(function() {
-                total += parseFloat($(this).val()) || 0;
-            });
-            $('#totalAmount').val(total.toFixed(2));
-        }
-
-        // Form validation before submit
-        $('#billForm').on('submit', function(e) {
+        $('#totalAmount').val(total.toFixed(2));
+    }
+    
+    // Form validation before submit
+    $('#billForm').on('submit', function(e) {
+        let isValid = true;
+        
+        // Validate each row
+        $('#billItems tbody tr').each(function() {
+            const itemType = $(this).find('.item-type').val();
+            const itemId = $(this).find('.item-select').val();
+            const quantity = $(this).find('.item-quantity').val();
+            
+            if (!itemType || !itemId || !quantity) {
+                isValid = false;
+                alert('Please fill in all bill item details.');
+                return false;  // Break the loop
+            }
+        });
+        
+        if (!isValid) {
             e.preventDefault();
-            
-            // Check if patient is selected
-            if (!$('select[name="patient_id"]').val()) {
-                alert('Please select a patient');
-                return false;
-            }
-            
-            // Check if at least one item is added
-            if ($('#billItems tbody tr').length < 1) {
-                alert('Please add at least one item to the bill');
-                return false;
-            }
-            
-            // Check if all items are properly filled
-            let isValid = true;
-            $('#billItems tbody tr').each(function() {
-                const row = $(this);
-                if (!row.find('.item-type').val() || 
-                    !row.find('.item-select').val() || 
-                    !row.find('.item-description').val() || 
-                    !row.find('.item-quantity').val() || 
-                    !row.find('.item-price').val() || 
-                    !row.find('.item-total').val()) {
-                    isValid = false;
-                    return false;
-                }
-            });
-            
-            if (!isValid) {
-                alert('Please fill in all item details correctly');
-                return false;
-            }
-            
-            // Submit the form if everything is valid
-            this.submit();
-        });
-
-        // Initialize the first row
-        $('.item-type').first().trigger('change');
+            return false;
+        }
+        
+        // Optional: Additional form validation can be added here
+        return true;
     });
+});
 </script>
 {% endblock %}

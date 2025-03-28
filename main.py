@@ -9,8 +9,8 @@ from datetime import datetime
 # Initialize Flask app
 app = Flask(__name__)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:#Deno0707@204.12.205.217:5432/kips"
-# app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///kips.db"
+# app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:#Deno0707@204.12.205.217:5432/kips"
+app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///kips.db"
 app.config["SECRET_KEY"] = "#deno0707@mwangi"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -966,52 +966,40 @@ def fix_bill_statuses():
 @login_required
 @role_required(['admin', 'lab_technician'])
 def lab_results():
+
     # If lab technician, show only their results
-    if current_user.role == 'lab_technician':
-        technician = LabTechnician.query.filter_by(email=current_user.email).first()
-        results = LabResult.query.filter_by(technician_id=technician.id).all()
-    else:
         # Admin sees all results
-        results = LabResult.query.all()
+    results = LabResult.query.filter_by(status="Completed").all()
     
     return render_template('lab_results.html', results=results)
 
-@app.route('/add-lab-result/<int:bill_item_id>', methods=['GET', 'POST'])
+@app.route('/add-lab-result', methods=['GET', 'POST'])
 @login_required
 @role_required(['lab_technician'])
-def add_lab_result(bill_item_id):
-    bill_item = BillItem.query.get_or_404(bill_item_id)
-    
-    # Find the associated lab service request
-    lab_service_request = LabServiceRequest.query.filter_by(bill_id=bill_item.bill_id).first()
-    
-    if not lab_service_request:
-        flash('No associated lab service request found.', 'danger')
-        return redirect(url_for('pending_lab_service_requests'))
-    
+def add_lab_result():  
+    patient_id = request.args.get('patient_id')
+    lab_result_id = request.args.get('lab_result_id')
+    lab_service_name = request.args.get('lab_service_name')
+    firstname = request.args.get('firstname')
+    lastname = request.args.get('lastname') 
     # Ensure the lab technician can only add results for their own service
     if request.method == 'POST':
         try:
+            print("p")
             # Find the current logged-in lab technician by email
-            current_lab_tech = LabTechnician.query.filter_by(email=current_user.email).first()
-            
+            current_lab_tech = LabTechnician.query.filter_by(email="labtech@hospital.com").first()
+            print(current_lab_tech)
+            print(current_lab_tech)
             if not current_lab_tech:
                 flash('Lab technician profile not found.', 'danger')
                 return redirect(url_for('pending_lab_service_requests'))
             
-            # Create new lab result
-            new_lab_result = LabResult(
-                patient_id=bill_item.bill.patient_id,  # Add patient_id
-                bill_item_id=bill_item_id,
-                technician_id=current_lab_tech.id,
-                result_value=request.form.get('result_value', ''),
-                reference_range=request.form.get('reference_range', ''),
-                remarks=request.form.get('remarks', ''),
-                status='Completed',
-                performed_at=datetime.utcnow()
-            )
-            
-            db.session.add(new_lab_result)
+
+            lab_result = LabResult.query.filter_by(id=lab_result_id).first()
+            lab_result.result_value=request.form.get('result_value', '')
+            lab_result.reference_range=request.form.get('reference_range', '')
+            lab_result.remarks=request.form.get('remarks', '')
+            lab_result.status="Completed"
             db.session.commit()
             
             flash('Lab result added successfully!', 'success')
@@ -1022,14 +1010,10 @@ def add_lab_result(bill_item_id):
             flash(f'Error adding lab result: {str(e)}', 'danger')
             print(f"Full Error: {e}")
     
-    # Get the lab service details for the bill item
-    lab_service = lab_service_request.lab_service
-    patient = bill_item.bill.patient
+    
     
     return render_template('add_lab_result.html', 
-                           bill_item=bill_item, 
-                           lab_service=lab_service, 
-                           patient=patient)
+                           lab_service_name=lab_service_name, firstname=firstname, lastname=lastname)
 
 @app.route('/edit-lab-result/<int:result_id>', methods=['GET', 'POST'])
 @login_required
@@ -1247,6 +1231,7 @@ def request_lab_service():
 @login_required
 @role_required(['doctor', 'admin', 'lab_technician'])
 def view_lab_service_requests():
+    print("hello")
     # Filter requests based on user role
     if current_user.role == 'doctor':
         requests = LabServiceRequest.query.filter_by(doctor_id=current_user.doctor.id).all()
@@ -1254,7 +1239,7 @@ def view_lab_service_requests():
         requests = LabServiceRequest.query.filter_by(status='Pending').all()
     else:  # admin
         requests = LabServiceRequest.query.all()
-    
+    print(request)
     return render_template('lab_service_requests.html', requests=requests)
 
 @app.route('/process-lab-service-request/<int:request_id>', methods=['GET', 'POST'])
@@ -1319,7 +1304,8 @@ def process_lab_service_request(request_id):
                     reference_range=None,  # Add reference range
                     status='Pending',
                     remarks=notes or 'Lab service request approved',
-                    performed_at=datetime.utcnow()
+                    performed_at=datetime.utcnow(),
+                    lab_request_id=request_id
                 )
                 db.session.add(lab_result)
                 
@@ -1357,7 +1343,13 @@ def view_lab_result(result_id):
         return redirect(url_for('index'))
     
     # Find the lab result
-    lab_result = LabResult.query.get_or_404(result_id)
+    from sqlalchemy.orm import joinedload
+
+    
+
+    lab_result = (LabResult.query.options(joinedload(LabResult.patient),joinedload(LabResult.bill_item))).filter_by(id=result_id).first()
+   
+
     
     # If user is a doctor, ensure they are associated with the patient
     if current_user.role == 'doctor':
@@ -1368,7 +1360,8 @@ def view_lab_result(result_id):
         if not doctor:
             flash('Doctor profile not found.', 'danger')
             return redirect(url_for('index'))
-    
+    print(lab_result.bill_item.description)
+    print(lab_result.__dict__)
     return render_template('view_lab_result.html', result=lab_result)
 
 @app.route('/pending-lab-service-requests', methods=['GET'])
@@ -1376,29 +1369,31 @@ def view_lab_result(result_id):
 @role_required(['lab_technician'])
 def pending_lab_service_requests():
     # Find approved lab service requests that need lab results
-    pending_requests = LabServiceRequest.query.filter(
-        LabServiceRequest.status == 'Approved',
-        LabServiceRequest.bill_id.isnot(None)
-    ).all()
-    
-    # Filter out requests that already have completed lab results
-    filtered_requests = []
-    for request in pending_requests:
-        # Check if the bill associated with this request has any bill items
-        bill = Bill.query.get(request.bill_id)
-        if bill and bill.items:
-            # Check if any bill item has a completed lab result
-            has_completed_result = False
-            for item in bill.items:
-                # Check if the bill item has a lab result
-                lab_result = LabResult.query.filter_by(bill_item_id=item.id).first()
-                if lab_result and lab_result.status == 'Completed':
-                    has_completed_result = True
-                    break
-            
-            if not has_completed_result:
-                filtered_requests.append(request)
-    
+    from sqlalchemy.orm import joinedload
+    filtered_requests = db.session.query(
+
+    LabResult.id.label("lab_result_id"),
+    LabServiceRequest.id,
+    LabServiceRequest.status,
+    LabServiceRequest.urgency,
+    LabServiceRequest.created_at,
+    Doctor.first_name.label("doctor_first_name"),
+    Doctor.last_name.label("doctor_last_name"),
+    Patient.first_name.label("patient_first_name"),
+    Patient.last_name.label("patient_last_name"),
+    Patient.id.label("patient_id"),
+    LabResult.status.label("lab_result_status"),
+    LabResult.result_value,
+    LabService.name.label("lab_service_name")  # Added LabService name
+).join(Doctor, LabServiceRequest.doctor_id == Doctor.id)\
+ .join(Patient, LabServiceRequest.patient_id == Patient.id)\
+ .join(LabResult, LabServiceRequest.id == LabResult.lab_request_id)\
+ .join(LabService, LabServiceRequest.lab_service_id == LabService.id)\
+ .filter(
+        LabResult.status == 'Pending')\
+ .all()
+
+    print(filtered_requests)
     return render_template('pending_lab_service_requests.html', requests=filtered_requests)
 
 @app.route('/edit-doctor/<int:doctor_id>', methods=['GET', 'POST'])

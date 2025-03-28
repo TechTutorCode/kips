@@ -27,7 +27,8 @@ class LabServiceRequest(db.Model):
     doctor = db.relationship('Doctor', backref='lab_service_requests')
     patient = db.relationship('Patient', backref='lab_service_requests')
     lab_service = db.relationship('LabService', backref='lab_service_requests')
-    bill = db.relationship('Bill', backref='lab_service_request')
+    bill = db.relationship('Bill', backref='lab_service_request') 
+    lab_service = db.relationship('LabResult', back_populates='lab_result')
     
     def __repr__(self):
         return f"<LabServiceRequest(id={self.id}, doctor_id={self.doctor_id}, patient_id={self.patient_id}, status={self.status})>"

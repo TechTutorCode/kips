@@ -8,6 +8,7 @@ class LabResult(db.Model):
     patient_id = db.Column(db.Integer, db.ForeignKey('patients.id'), nullable=False)
     bill_item_id = db.Column(db.Integer, db.ForeignKey('bill_items.id'), nullable=True)
     technician_id = db.Column(db.Integer, db.ForeignKey('lab_technicians.id'), nullable=True)
+    lab_request_id = db.Column(db.Integer, db.ForeignKey('lab_service_requests.id'), nullable=True)
     
     result_value = db.Column(db.Text, nullable=False)
     reference_range = db.Column(db.String(100))
@@ -22,6 +23,7 @@ class LabResult(db.Model):
     patient = db.relationship('Patient', back_populates='lab_results')
     bill_item = db.relationship('BillItem', backref='lab_result')
     technician = db.relationship('LabTechnician', back_populates='lab_results')
+    lab_result = db.relationship('LabServiceRequest', back_populates='lab_service')
     
     # Add patient relationship through bill
     @property
